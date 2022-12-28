@@ -92,8 +92,8 @@ def usage(type):
             allocatable_inmb=round_down(int(allocatable))
 
         usage=max_inmb - allocatable_inmb
-        #usage_percent = (usage/max_inmb) * 100
-        usage_percent = random.randint(1,100)
+        usage_percent = (usage/max_inmb) * 100
+        #usage_percent = random.randint(1,100)
         
         old_stdout = sys.stdout
         sys.stdout = f
