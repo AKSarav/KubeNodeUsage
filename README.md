@@ -1,5 +1,7 @@
 # Kube-node-usage
 
+![Alt text](kube-node-cpu-usage.png)
+
 **Kubernetes Node Usage** or **Kube-Node-Usage** is a CLI tool to get the Memory, CPU and Disk Usage of Kubernetes Nodes
 
 it is designed on python and relies on the `kubectl` installed in your local.
