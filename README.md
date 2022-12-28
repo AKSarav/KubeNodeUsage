@@ -23,7 +23,7 @@ Kube-Node-Usage simply execute the `kubectl get nodes` command and parse the out
 
 <br/>
 
-### How to use Kube-Node-Usage
+### How to Set up / Install Kube-Node-Usage
 
 1. Clone the repository
 
@@ -45,7 +45,28 @@ pip install -r requirements.txt
 <br/>
 <br/>
 
+For some reason, If you do not wish to install the required python packages into the entire system
 
+You can create your virtual environment (virtualenv) and install the packages
+
+Here are the commands for the same
+
+```
+# python -m venv venv
+# source venv/bin/activate
+# pip install -r requirements.txt
+```
+Once you have used the `kube-node-usage` you can execute the `deactivate` command
+
+```
+# deactivate
+```
+
+### How to use Kube-Node-Usage
+
+Here are the list of commands Kube-Node-Usage supports and how it can be used.
+
+<br/>
 ##### List the Node with Disk Usage
 
 To list the Kubernetes nodes with Disk Usage execute the following command
