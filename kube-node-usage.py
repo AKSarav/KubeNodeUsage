@@ -1,3 +1,4 @@
+import getopt, sys
 import json
 import subprocess
 from tqdm import tqdm
@@ -15,6 +16,7 @@ f = open(os.devnull, 'w')
 def greet():
     print('''
 # Kube-Node-Usage
+# Release 1.0.2
 # https://github.com/AKSarav/Kube-Node-Usage
 ''')
 
@@ -62,9 +64,39 @@ def printbar(diskusage_percent):
             return diskbar
         # diskbar.close()
 
-def usage(type):
-    # getnodes first
+def sortbyusage(e):
+    return e['usage_percent']
 
+def sortbynode(e):
+    return e['node_name']
+
+def sortbyallocatable(e):
+    return e['allocatable_inmb']
+
+def sortbymax(e):
+    return e['max_inmb']
+    
+
+def usage():
+    print("-"*50)
+    print("# KubeNodeUsage - Usage instructions")
+    print("-"*50)
+    print("\n* Valid Usage types are --memory | -m , --cpu | -c , --disk | -d, --all | -a")
+    print("* Valid Sort by values are --sort=free | --sort=max | --sort=usage | --sort=node ")
+    print("\n# Examples:")
+    print("-"*10)
+    print("* To display the Memory Usage with default Sorting\n# python kube-node-usage.py --memory \n")
+    print("* To Display the Memory Usage sort by Usage Percentage\n# python kube-node-usage.py --memory --sort=usage \n")
+    print("* To Display the CPU Usage sort by the free/allocatable cpu\n# python kube-node-usage.py --cpu --sort=free \n")
+    print("* To Display the Disk Usage sort by the Max Disk\n# python kube-node-usage.py --disk --sort=max \n")
+    print("* To Apply the reverse/desc sort with the existing command add --reverse\n# python kube-node-usage.py --disk --sort=max --reverse \n")
+    print("-"*50)
+    exit(6)
+
+
+def action(type, sortkey, isreverse):
+    # getnodes first
+    # print("Starting with Args ",type,sortkey,isreverse)
     nodeslist=init()
     print("")
     print("# Disk Usage\n\n%-30s%-10s%-10s%s" % ("NodeName", "Free (GB)", "Max(GB)", "Usage(%)") ) if type == "disk" else ""
@@ -73,14 +105,16 @@ def usage(type):
 
     print("-"*80)
     
+    outputbuffer=[]
+
     for item in nodeslist['items']:
         node_name=item['metadata']['name']
-        if type == "disk":
+        if type == "disk" or type == "d":
             allocatable=item['status']['allocatable']['ephemeral-storage']
             maximum=item['status']['capacity']['ephemeral-storage'].split('Ki')[0]
             max_inmb=round(int(maximum) / 1024 / 1024)
             allocatable_inmb=round_down(int(allocatable)/1024/1024/1024)
-        elif type == "mem":
+        elif type == "memory":
             allocatable=item['status']['allocatable']['memory'].split('Ki')[0]
             maximum=item['status']['capacity']['memory'].split('Ki')[0]
             max_inmb=round(int(maximum) / 1024 /1024 )
@@ -92,48 +126,90 @@ def usage(type):
             allocatable_inmb=round_down(int(allocatable))
 
         usage=max_inmb - allocatable_inmb
-        usage_percent = (usage/max_inmb) * 100
-        #usage_percent = random.randint(1,100)
+        #usage_percent = (usage/max_inmb) * 100
+        usage_percent = random.randint(1,100)
         
         old_stdout = sys.stdout
         sys.stdout = f
         usage=str(printbar(usage_percent))
         sys.stdout = old_stdout
-        print("%-30s%-10d%-10d%s" % (node_name, allocatable_inmb, max_inmb, usage) )
-
-def main():
-
-    greet()    
-    state=''
-    input = sys.argv[1:]
-    if not input:
-        print('Collecting Disk Usage...')
-        usage("disk")
-    else:
-        if len(input) > 1:
-            print("Ignoring the second argument",input[1:])    
-        elif input[0] == "--memory" or sys.argv[1] == "-m":
-            print("Collecting the Memory Usage")
-            usage("mem")
-        elif input[0] == "--cpu" or sys.argv[1] == "-c":
-            print("Collecting the CPU Usage")
-            usage("cpu")
-        elif input[0] == "--disk" or sys.argv[1] == "-d":
-            print("Collecting the Disk Usage")
-            usage("disk")
-        elif input[0] == "--all" or sys.argv[1] == "-a":
-            print("Collecting the Disk, Memory and CPU Usage")   
-            usage("cpu")
-            usage("mem") 
-            usage("disk") 
-        else:
-            print("Invalid Option",input[0])
-            print("Valid options are --memory | -m , --cpu | -c , --disk | -d")
+        
+        tmp={
+            "node_name":node_name,
+            "allocatable_inmb":allocatable_inmb,
+            "max_inmb":max_inmb,
+            "usage_percent": usage_percent,
+            "usage": usage
+            }
+        outputbuffer.append(tmp)
 
 
+    if sortkey == "usage":
+        outputbuffer.sort(key=sortbyusage,reverse=isreverse)
+    elif sortkey == "free":
+        outputbuffer.sort(key=sortbyallocatable,reverse=isreverse)
+    elif sortkey == "max":
+        outputbuffer.sort(key=sortbymax,reverse=isreverse)
+    elif sortkey == "node":
+        outputbuffer.sort(key=sortbynode,reverse=isreverse)
 
     
-if __name__ == '__main__':
+    for line in outputbuffer:
+        print("%-30s%-10d%-10d%s" % (line['node_name'], line['allocatable_inmb'], line['max_inmb'], line['usage']) )    
+    
+
+def main():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], ":h", ["help", "sort=", "reverse", "memory", "cpu", "disk", "all"])
+    except getopt.GetoptError as err:
+        # print help information and exit:
+        print(err)  # will print something like "option -a not recognized"
+        usage()
+
+    # Defaults
+    usagetype="disk"
+    sortby="node_name"
+    isreverse=False #ASC
+
+    for o, a in opts:
+        if o in ("-h", "--help"):
+            print("Printing Help Instructions and Exitting..")
+            usage()
+            exit(5)
+        elif o in ("--cpu"):
+            # print("Collecting CPU Usage")
+            usagetype="cpu"          
+        elif o in ("--memory"):
+            # print("Collecting Memory Usage")
+            usagetype="memory"
+        elif o in ("--disk"):
+            # print("Collecting disk Usage")
+            usagetype="disk"
+        elif o in ("--sort"):
+            # print("Sorting")
+            sortby=a
+            if a not in ("max", "free", "usage", "node"):
+                print("Invalid Argument for Sort. It should be one of max | free | usage | node")
+                usage()
+
+        elif o in ("--all"):
+            print("Fetching all the Usage")
+            usagetype="all"
+        elif o in ("--reverse"):
+            # print("Reverse Sorting")
+            isreverse=True
+        else:
+            print("Not a valid option",o)   
+            exit(5)
+    greet()
+    if usagetype != "all":
+        action(usagetype, sortby, isreverse)
+    else:
+        action("disk", sortby, isreverse)
+        action("cpu", sortby, isreverse)
+        action("memory", sortby, isreverse)
+         
+
+
+if __name__ == "__main__":
     main()
-
-
