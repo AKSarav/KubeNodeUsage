@@ -156,6 +156,7 @@ def action(type, sortkey, isreverse):
     print(col_fmt.format(*["NodeName", "Free(GB)", "Max(GB)", "Usage(%)"])) if type == "disk" else ""
     print(col_fmt.format(*["NodeName", "Free(GB)", "Max(GB)", "Usage(%)"])) if type == "memory" else ""
     print(col_fmt.format(*["NodeName", "Free(m)", "Max(m)", "Usage(%)"])) if type == "cpu" else ""
+    print("-"*(node_name_len + 70))    
     
     for line in outputbuffer:
         print(col_fmt.format(*[line['node_name'], line['allocatable_inmb'], line['max_inmb'], line['usage']]) )
