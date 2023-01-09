@@ -16,7 +16,7 @@ f = open(os.devnull, 'w')
 def greet():
     print('''
 # Kube-Node-Usage
-# Release 1.0.2
+# Release 1.0.3
 # https://github.com/AKSarav/Kube-Node-Usage
 ''')
 
