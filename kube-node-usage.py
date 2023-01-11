@@ -153,9 +153,9 @@ def action(type, sortkey, isreverse):
         outputbuffer.sort(key=sortbynode,reverse=isreverse)
 
     col_fmt="{:<"+str(node_name_len)+"}"+"\t{:<12}" * 3
-    print(col_fmt.format(*["NodeName", "Free(GB)", "Max(GB)", "Usage(%)"])) if type == "disk" else ""
-    print(col_fmt.format(*["NodeName", "Free(GB)", "Max(GB)", "Usage(%)"])) if type == "memory" else ""
-    print(col_fmt.format(*["NodeName", "Free(m)", "Max(m)", "Usage(%)"])) if type == "cpu" else ""
+    print("# Disk Usage\n\n"+col_fmt.format(*["NodeName", "Free(GB)", "Max(GB)", "Usage(%)"])) if type == "disk" else ""
+    print("# Memory Usage\n\n"+col_fmt.format(*["NodeName", "Free(GB)", "Max(GB)", "Usage(%)"])) if type == "memory" else ""
+    print("# CPU Usage\n\n"+col_fmt.format(*["NodeName", "Free(m)", "Max(m)", "Usage(%)"])) if type == "cpu" else ""
     print("-"*(node_name_len + 70))    
     
     for line in outputbuffer:
