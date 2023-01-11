@@ -16,7 +16,7 @@ f = open(os.devnull, 'w')
 def greet():
     print('''
 # Kube-Node-Usage
-# Release 1.0.2
+# Release 1.0.3
 # https://github.com/AKSarav/Kube-Node-Usage
 ''')
 
@@ -99,14 +99,10 @@ def action(type, sortkey, isreverse):
     # print("Starting with Args ",type,sortkey,isreverse)
     nodeslist=init()
     print("")
-    print("# Disk Usage\n\n%-30s%-10s%-10s%s" % ("NodeName", "Free (GB)", "Max(GB)", "Usage(%)") ) if type == "disk" else ""
-    print("# Memory Usage\n\n%-30s%-10s%-10s%s" % ("NodeName", "Free (GB)", "Max(GB)", "Usage(%)") ) if type == "mem" else ""
-    print("# CPU Usage\n\n%-30s%-10s%-10s%s" % ("NodeName", "Free (m)", "Max (m)", "Usage(%)") ) if type == "cpu" else ""
-
-    print("-"*80)
     
+    node_name_len=0
     outputbuffer=[]
-
+    
     for item in nodeslist['items']:
         node_name=item['metadata']['name']
         if type == "disk" or type == "d":
@@ -123,7 +119,10 @@ def action(type, sortkey, isreverse):
             allocatable=item['status']['allocatable']['cpu'].split('m')[0]
             maximum=int(item['status']['capacity']['cpu'])*1000
             max_inmb=round(int(maximum))
-            allocatable_inmb=round_down(int(allocatable))
+            allocatable_inmb=int(allocatable)
+
+        if len(node_name)>node_name_len:
+            node_name_len = len(node_name)
 
         usage=max_inmb - allocatable_inmb
         usage_percent = (usage/max_inmb) * 100
@@ -153,10 +152,14 @@ def action(type, sortkey, isreverse):
     elif sortkey == "node":
         outputbuffer.sort(key=sortbynode,reverse=isreverse)
 
+    col_fmt="{:<"+str(node_name_len)+"}"+"\t{:<12}" * 3
+    print(col_fmt.format(*["NodeName", "Free(GB)", "Max(GB)", "Usage(%)"])) if type == "disk" else ""
+    print(col_fmt.format(*["NodeName", "Free(GB)", "Max(GB)", "Usage(%)"])) if type == "memory" else ""
+    print(col_fmt.format(*["NodeName", "Free(m)", "Max(m)", "Usage(%)"])) if type == "cpu" else ""
+    print("-"*(node_name_len + 70))    
     
     for line in outputbuffer:
-        print("%-30s%-10d%-10d%s" % (line['node_name'], line['allocatable_inmb'], line['max_inmb'], line['usage']) )    
-    
+        print(col_fmt.format(*[line['node_name'], line['allocatable_inmb'], line['max_inmb'], line['usage']]) )
 
 def main():
     try:
