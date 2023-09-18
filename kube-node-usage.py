@@ -6,13 +6,17 @@ import math
 import os
 import sys
 import time
-# Threading will be enabled in future
-#import threading
-import random
+import threading
+import loguru
+import curses
+import pdb
 
 # For Redirecting the output to /dev/null
 f = open(os.devnull, 'w')
 
+# logger
+def log(*args, **kwargs):
+    loguru.logger.opt(depth=1).info(*args, **kwargs)
 
 def greet():
     print('''
@@ -53,17 +57,50 @@ def inittop():
         print("Failed to execute the Kubectl top nodes command")
         exit(5)
 
+def getpodcount(node_names):
+        
+        result={}
+        
+        for node_name in node_names:
+            podcmd=subprocess.run(["kubectl", "describe" ,"node", node_name], capture_output=True,timeout=60)
+
+            if podcmd.stdout:
+                output=podcmd.stdout.decode('utf-8').splitlines()
+                # Find the Non-terminated pods line
+                output2=[x for x in output if "Non-terminated Pods" in x]
+
+                # using Lambda function
+                # output2=list(filter(lambda x: "Non-terminated Pods" in x, output))
+
+                # Find the number of pods
+                podcount=output2[0].split(" ")[-3].strip("(")
+                print("Pod count for the node {} is {}".format(node_name,podcount))
+                result[node_name]=podcount
+
+                # Get the pod names
+                podnames=[x.split(" ")[0] for x in output if "Running" in x]
+                print(podnames)
+                result[node_name]["pods"]=podnames
+
+            else:
+                print(podcmd.stderr.decode('utf-8'))
+                print("Failed to execute the Kubectl describe node command")
+                return "ERROR"
+
+
+
+
 def printbar(diskusage_percent):
         with tqdm(total=100, bar_format="{l_bar}{bar}", position=0, leave=True, file=sys.stdout, ncols=60) as diskbar:
         
-            # For Debug
-            #diskusage_percent=random.randint(1,100)
-            if diskusage_percent <= 30:
-                diskbar.colour = 'green'
-            if diskusage_percent > 30 and diskusage_percent < 70 :
-                diskbar.colour = 'yellow'
-            if diskusage_percent >= 70:
-                diskbar.colour = 'red'
+            # # Not needed anymore this is handled by the curses wrapper
+            # #diskusage_percent=random.randint(1,100)
+            # if diskusage_percent <= 30:
+            #     diskbar.colour = 'green'
+            # if diskusage_percent > 30 and diskusage_percent < 70 :
+            #     diskbar.colour = 'yellow'
+            # if diskusage_percent >= 70:
+            #     diskbar.colour = 'red'
 
             # to avoid multiple prints
             old_stdout = sys.stdout
@@ -88,7 +125,7 @@ def sortbyallocatable(e):
 def sortbymax(e):
     return e['max_inmb']
     
-def printargs(usagetype, sortby, isreverse, filternodes, filtercolors):
+def printargs(usagetype, sortby, isreverse, filternodes, filtercolors, filterlabels):
     print("""
 Arguments Passed
 -----------------
@@ -130,19 +167,33 @@ def usage():
     # python kube-node-usage.py (--memory|--cpu|--disk) (--sort=free|max|usage|node) (--reverse) (--debug) (--filtercolors=red,yellow,green|red|yellow|green) (--filternodes=node1,node2) 
 
 
+def findnodeswithlabel(lbl):
+    nodeslist=init()
+    nodeswithlabel=[]
+    for item in nodeslist['items']:
+        node_name=item['metadata']['name']
+        if 'labels' in item['metadata']:
+            for label in lbl:
+                if label in str(item['metadata']['labels']):
+                    nodeswithlabel.append(node_name)
+                    break
+    print("Nodes with label ",nodeswithlabel)
+    return nodeswithlabel
 
 
-
-
-def action(type, sortkey, isreverse, filternodes=[], filtercolors=[]):
+def action(type, sortkey, isreverse, filternodes=[], filtercolors=[], filterlabels=[]):
     # getnodes first
     # print("Starting with Args ",type,sortkey,isreverse)
     nodeslist=init()
     nodetoplist=inittop()
-    
     nodetopusage=[]
     nodeusagemap=[]
-    
+    nodeswithlabel=[]
+
+
+    if filternodes:
+        nodeslist['items']=[item for item in nodeslist['items'] if item['metadata']['name'] in filternodes]
+
     for line in nodetoplist.splitlines():
         nodetopusage+=[line.split()]
     
@@ -187,10 +238,13 @@ def action(type, sortkey, isreverse, filternodes=[], filtercolors=[]):
             node_name_len = len(node_name)
 
         
+        # this is to create random usage for testing
         #usage_percent = random.randint(1,100)
         
+        # store the output in a buffer including the progress bar
         old_stdout = sys.stdout
         sys.stdout = f
+        # this is locked between sys.stdout to avoid multiple prints
         usage=str(printbar(usage_percent))
         sys.stdout = old_stdout
         
@@ -213,33 +267,15 @@ def action(type, sortkey, isreverse, filternodes=[], filtercolors=[]):
     elif sortkey == "node":
         outputbuffer.sort(key=sortbynode,reverse=isreverse)
 
-    col_fmt="{:<"+str(node_name_len)+"}"+"\t{:<12}" * 3
-    print("\r\n# Disk Usage\n\n"+col_fmt.format(*["NodeName", "Free(GB)", "Max(GB)", "Usage(%)"])) if type == "disk" else ""
-    print("\r\n# Memory Usage\n\n"+col_fmt.format(*["NodeName", "Free(GB)", "Max(GB)", "Usage(%)"])) if type == "memory" else ""
-    print("\r\n# CPU Usage\n\n"+col_fmt.format(*["NodeName", "Free(m)", "Max(m)", "Usage(%)"])) if type == "cpu" else ""
-    print("-"*(node_name_len + 70))    
+    # col_fmt="{:<"+str(node_name_len)+"}"+"\t{:<12}" * 3
+
+    # print("\r\n# Disk Usage\n\n"+col_fmt.format(*["NodeName", "Free(GB)", "Max(GB)", "Usage(%)"])) if type == "disk" else ""
+    # print("\r\n# Memory Usage\n\n"+col_fmt.format(*["NodeName", "Free(GB)", "Max(GB)", "Usage(%)"])) if type == "memory" else ""
+    # print("\r\n# CPU Usage\n\n"+col_fmt.format(*["NodeName", "Free(m)", "Max(m)", "Usage(%)"])) if type == "cpu" else ""
+    # print("-"*(node_name_len + 70))    
     
-    for line in outputbuffer:  
-        # case where only filtercolors is provided but not filternodes
-        if len(filternodes) > 0 and len(filtercolors) == 0:
-            if line['node_name'] in filternodes:
-                print(col_fmt.format(*[line['node_name'], line['allocatable_inmb'], line['max_inmb'], line['usage']]),flush=True)                
+    return outputbuffer
 
-        # case where only filternodes is provided but not filtercolors
-        elif len(filternodes) == 0 and len(filtercolors) > 0:
-            if 'red' in filtercolors:
-                if line['usage_percent'] > 70:
-                    print(col_fmt.format(*[line['node_name'], line['allocatable_inmb'], line['max_inmb'], line['usage']]),flush=True)
-            if 'yellow' in filtercolors:
-                if line['usage_percent'] > 30 and line['usage_percent'] < 70:
-                    print(col_fmt.format(*[line['node_name'], line['allocatable_inmb'], line['max_inmb'], line['usage']]),flush=True)
-            if 'green' in filtercolors:
-                if line['usage_percent'] < 30:
-                    print(col_fmt.format(*[line['node_name'], line['allocatable_inmb'], line['max_inmb'], line['usage']]),flush=True)
-
-        # case where neither filternodes nor filtercolors are provided                    
-        else:
-            print(col_fmt.format(*[line['node_name'], line['allocatable_inmb'], line['max_inmb'], line['usage']]),flush=True)
 def isdigit(s):
     try:
         int(s)
@@ -247,9 +283,45 @@ def isdigit(s):
     except ValueError:
         return False
 
+
+def __act(interval, usagetype, sortby, isreverse, filternodes, filtercolors, filterlabels, debug):
+    # use body_left for the following segment
+    # print message if filtercolors and filternodes are enabled at the same time
+    if len(filtercolors) > 0 and len(filternodes) > 0:
+        print("--- ERROR: Filtering by NodeNames and Usage Colors are mutually exclusive. Please use either one of them")
+        exit(5)
+    
+    output_buffer=[]
+
+    if interval != 0:
+        while True:          
+            if usagetype != "all":
+                printargs(usagetype, sortby, isreverse, filternodes, filtercolors, filterlabels) if debug else ""
+                output_buffer.append(action(usagetype, sortby, isreverse, filternodes, filtercolors, filterlabels))
+            else:
+                printargs(usagetype, sortby, isreverse, filternodes, filtercolors, filterlabels) if debug else ""
+                output_buffer.append(action("disk", sortby, isreverse, filternodes, filtercolors, filterlabels))
+                output_buffer.append(action("cpu", sortby, isreverse, filternodes, filtercolors, filterlabels))
+                output_buffer.append(action("memory", sortby, isreverse, filternodes, filtercolors, filterlabels))
+            # sleep 5 seconds        
+            time.sleep(5)
+            os.system('clear')
+            
+    else:
+        if usagetype != "all":
+            printargs(usagetype, sortby, isreverse, filternodes, filtercolors, filterlabels) if debug else ""
+            output_buffer.append(action(usagetype, sortby, isreverse, filternodes, filtercolors, filterlabels))
+        else:
+            printargs(usagetype, sortby, isreverse, filternodes, filtercolors, filterlabels) if debug else ""
+            output_buffer.append(action("disk", sortby, isreverse, filternodes, filtercolors, filterlabels))
+            output_buffer.append(action("cpu", sortby, isreverse, filternodes, filtercolors, filterlabels))
+            output_buffer.append(action("memory", sortby, isreverse, filternodes, filtercolors, filterlabels))
+
+    return output_buffer
+
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], ":h", ["help", "sort=", "reverse", "memory", "cpu", "disk", "all","interval=","filternodes=","filtercolors=","debug"])
+        opts, args = getopt.getopt(sys.argv[1:], ":h", ["help", "sort=", "reverse", "memory", "cpu", "disk", "all","interval=","filternodes=","filtercolors=","filterlabels=","debug"])
     except getopt.GetoptError as err:
         # print help information and exit:
         print(err)  # will print something like "option -a not recognized"
@@ -262,6 +334,7 @@ def main():
     isreverse=False #ASC
     filtercolors=[]
     filternodes=[]
+    filterlabels=[]
     debug=False
 
     for o, a in opts:
@@ -306,7 +379,11 @@ def main():
                 filternodes=a.split(",")
             else:
                 filternodes=a.split(" ")
-
+        elif o in ("--filterlabels"):
+            if "," in a:
+                filterlabels=a.split(",")
+            else:
+                filterlabels=a.split(" ")
         elif o in ("--filtercolors"):
             if "," in a:
                 filtercolors=a.split(",")
@@ -327,35 +404,113 @@ def main():
     os.system('clear')
     greet()
     time.sleep(2)  
-    
-    # print messagee if filtercolors and filternodes are enabled at the same time
-    if len(filtercolors) > 0 and len(filternodes) > 0:
-        print("--- ERROR: Filtering by NodeNames and Usage Colors are mutually exclusive. Please use either one of them")
-        exit(5)
-    if interval != 0:
-        while True:          
-            if usagetype != "all":
-                printargs(usagetype, sortby, isreverse, filternodes, filtercolors) if debug else ""
-                action(usagetype, sortby, isreverse, filternodes, filtercolors)
-            else:
-                printargs(usagetype, sortby, isreverse, filternodes, filtercolors) if debug else ""
-                action("disk", sortby, isreverse, filternodes, filtercolors)
-                action("cpu", sortby, isreverse, filternodes, filtercolors)
-                action("memory", sortby, isreverse, filternodes, filtercolors)
-            # sleep for 30 seconds        
-            time.sleep(5)
-            os.system('clear')
-            
-    else:
-        if usagetype != "all":
-            printargs(usagetype, sortby, isreverse, filternodes, filtercolors) if debug else ""
-            action(usagetype, sortby, isreverse, filternodes, filtercolors)
-        else:
-            printargs(usagetype, sortby, isreverse, filternodes, filtercolors) if debug else ""
-            action("disk", sortby, isreverse, filternodes, filtercolors)
-            action("cpu", sortby, isreverse, filternodes, filtercolors)
-            action("memory", sortby, isreverse, filternodes, filtercolors)     
 
-    print("")
+    # send the option to the curses wrapper
+    args = (interval, usagetype, sortby, isreverse, filternodes, filtercolors, filterlabels, debug)
+    curses.wrapper(draw_output, *args)
+
+def draw_output(stdscr, *args):
+    k = 0
+    # Clear and refresh the screen for a blank canvas
+    stdscr.keypad(True)
+    curses.use_default_colors()
+    curses.noecho()
+    while (k != ord('q')):
+        # Initialization
+        height, width = stdscr.getmaxyx()
+        
+        cols_tot = width
+        rows_tot = height
+        cols_mid = int(0.7*cols_tot)  # 70% of the width
+        rows_mid = int(0.9*rows_tot) # 1000% of the height
+
+        # add red , yellow and green colors for progress bar
+        curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
+        curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+        curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_BLACK)
+
+        progress_red=curses.color_pair(1)
+        progress_yellow=curses.color_pair(2)
+        progress_green=curses.color_pair(3)
+
+        # assign args to variables
+        interval, usagetype, sortby, isreverse, filternodes, filtercolors, filterlabels, debug = args
+
+
+        pad11 = curses.newpad(rows_mid, cols_mid)
+        # pad11.border('|', '|', '-', '-', '+', '+', '+', '+')
+        pad12 = curses.newpad(rows_mid, cols_mid)
+        pad12.border('|', '|', '-', '-', '+', '+', '+', '+')
+
+        pad11.addstr(0, 5, " Kube Node Usage | v2.1 | github.com/aksarav/kube-node-usage ")
+        pad11.refresh(0, 0, 0, 0, rows_mid, cols_mid)
+        
+        col_fmt="{:<"+str("15")+"}"+"\t{:<12}" * 3
+        pad11.addstr(1, 3, "*** Disk Usage ***") if usagetype == "disk" else ...
+        pad11.addstr(2, 3,col_fmt.format(*["NodeName", "Free(GB)", "Max(GB)", "Usage(%)"])) if usagetype == "disk" else ""
+
+        pad11.addstr(1, 3, "*** Memory Usage ***") if usagetype == "memory" else ...
+        pad11.addstr(2, 3,col_fmt.format(*["NodeName", "Free(GB)", "Max(GB)", "Usage(%)"])) if usagetype == "memory" else ""
+
+        pad11.addstr(1, 3, "*** CPU Usage ***") if usagetype == "cpu" else ...
+        pad11.addstr(2, 3,col_fmt.format(*["NodeName", "Free(m)", "Max(m)", "Usage(%)"])) if usagetype == "cpu" else ""
+        pad11.refresh(0, 0, 0, 0, rows_mid, cols_mid)
+
+        # Call __act with the arguments
+        buffer=__act(*args)
+        printbuffer=[]
+        for line in buffer[0]:
+            # case where only filtercolors is provided but not filternodes
+            if len(filternodes) > 0 and len(filtercolors) == 0:
+                # to select only the nodes which are in filternodes
+                if line['node_name'] in filternodes:
+                    printbuffer.append(line) 
+            # case where only filternodes is provided but not filtercolors
+            elif len(filternodes) == 0 and len(filtercolors) > 0:
+                if 'red' in filtercolors and line['usage_percent'] > 70:                            
+                    printbuffer.append(line) 
+                if 'yellow' in filtercolors and line['usage_percent'] > 30 and line['usage_percent'] < 70:                            
+                    printbuffer.append(line) 
+                if 'green' in filtercolors and line['usage_percent'] < 30:
+                    printbuffer.append(line) 
+
+            elif len(filterlabels) > 0:
+                nodeswithlabel=findnodeswithlabel(filterlabels)
+                if line['node_name'] in nodeswithlabel:
+                    printbuffer.append(line)
+
+            # case where neither filternodes nor filtercolors are provided                    
+            else:
+                printbuffer.append(line) 
+
+        for line in printbuffer:
+            idx=printbuffer.index(line)+5
+            if line['usage_percent'] > 70:
+                pad11.addstr(idx, 2, col_fmt.format(*[line['node_name'], line['allocatable_inmb'], line['max_inmb'], line['usage']]), progress_red)
+                time.sleep(0.02)
+            elif line['usage_percent'] > 30 and line['usage_percent'] < 70:
+                pad11.addstr(idx, 2, col_fmt.format(*[line['node_name'], line['allocatable_inmb'], line['max_inmb'], line['usage']]), progress_yellow)
+                time.sleep(0.02)
+            elif line['usage_percent'] < 30:
+                pad11.addstr(idx, 2, col_fmt.format(*[line['node_name'], line['allocatable_inmb'], line['max_inmb'], line['usage']]), progress_green)                            
+                time.sleep(0.02)
+            pad11.refresh(0, 0, 0, 0, rows_mid, cols_mid)
+
+        # pad12.addstr(0, 0, "*** Pod Info ***")
+        # pad12.refresh(0, 0, 0, cols_mid, rows_mid, cols_tot-1)
+        
+        cmd = stdscr.getkey()
+        if cmd:
+            pad11.addstr(0, 0, "Key pressed is {}".format(cmd))
+            pad11.refresh(0, 0, 0, 0, rows_mid, cols_mid)
+            if  cmd == curses.KEY_DOWN:
+                pad11 += 1
+                pad11.refresh(0, 0, 0, 0, rows_mid, cols_mid)
+            elif cmd == curses.KEY_UP:
+                pad11 -= 1
+                pad11.refresh(0, 0, 0, 0, rows_mid, cols_mid)
+        
+        stdscr.getch()
+
 if __name__ == "__main__":
     main()
