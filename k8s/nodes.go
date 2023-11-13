@@ -3,34 +3,38 @@ package k8s
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
+	"kubenodeusage/utils"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 type Node struct {
-	Name string
-	Capacity_disk int
-	Capacity_memory int
-	Capacity_cpu int
-	Usage_disk int
-	Usage_memory int
-	Usage_cpu float32
-	Usage_disk_percent float32
+	Name                 string
+	Capacity_disk        int
+	Capacity_memory      int
+	Capacity_cpu         int
+	Usage_disk           int
+	Usage_memory         int
+	Usage_cpu            float32
+	Free_disk            int
+	Free_memory          int
+	Free_cpu             float32
+	Usage_disk_percent   float32
 	Usage_memory_percent float32
-	Usage_cpu_percent float32
+	Usage_cpu_percent    float32
 }
 
 var NodeStatsList []Node
 
-func Nodes(metric string)(NodeStatsList []Node) {
-	
+func Nodes(metric string) (NodeStatsList []Node) {
+
+	utils.InitLogger()
 	kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
@@ -55,7 +59,7 @@ func Nodes(metric string)(NodeStatsList []Node) {
 	}
 
 	// To fetch kubectl get nodes information
-	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{}); 
+	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{})
 	if err != nil {
 		fmt.Println("Failed to Get Nodes")
 		panic(err.Error())
@@ -74,95 +78,89 @@ func Nodes(metric string)(NodeStatsList []Node) {
 
 	nodestats := Node{}
 
-
 	for _, nm := range nodeMetrics.Items {
-			for _, node := range nodes.Items{
+		for _, node := range nodes.Items {
 			if node.Name == nm.Name {
 				// fmt.Println("Node Name:", node.Name)
 				nodestats.Name = node.Name
 
-				switch (metric){
-					case "memory":
-						// Ki - Kibibyte - 1024 bytes
-						nodestats.Capacity_memory, err = strconv.Atoi(strings.TrimSuffix(node.Status.Capacity.Memory().String(), "Ki"))
-						if err != nil {
-							fmt.Println("Error converting Memory capacity")
-						}
-						// fmt.Println("Capacity Memory:", nodestats.Capacity_memory)
-
-						// output is in Ki - Kibibyte - 1024 bytes
-						if memusage, err := strconv.Atoi(strings.TrimSuffix(nm.Usage.Memory().String(), "Ki")); err != nil {
-							// Try with Mi - Mebibyte - 1024 * 1024 bytes
-							if memusage, err := strconv.Atoi(strings.TrimSuffix(nm.Usage.Memory().String(), "Mi")); err != nil {
-								fmt.Println("Error converting Memory usage",err)
-							} else {
-								nodestats.Usage_memory = memusage
-							}
+				switch metric {
+				case "memory":
+					// Ki - Kibibyte - 1024 bytes
+					nodestats.Capacity_memory, err = strconv.Atoi(strings.TrimSuffix(node.Status.Capacity.Memory().String(), "Ki"))
+					if err != nil {
+						fmt.Println("Error converting Memory capacity")
+					}
+					// output is in Ki - Kibibyte - 1024 bytes
+					if memusage, err := strconv.Atoi(strings.TrimSuffix(nm.Usage.Memory().String(), "Ki")); err != nil {
+						// Try with Mi - Mebibyte - 1024 * 1024 bytes
+						if memusage, err := strconv.Atoi(strings.TrimSuffix(nm.Usage.Memory().String(), "Mi")); err != nil {
+							fmt.Println("Error converting Memory usage", err)
 						} else {
 							nodestats.Usage_memory = memusage
-							// fmt.Println("Usage Memory:", nodestats.Usage_memory)
+							nodestats.Free_memory = nodestats.Capacity_memory - nodestats.Usage_memory
 						}
+					} else {
+						nodestats.Usage_memory = memusage
+						nodestats.Free_memory = nodestats.Capacity_memory - nodestats.Usage_memory
+					}
 
-						nodestats.Usage_memory_percent = float32(nodestats.Usage_memory) / float32(nodestats.Capacity_memory) * 100
-						// fmt.Println("Usage Memory Percent:", nodestats.Usage_memory_percent)
-						
-						NodeStatsList = append(NodeStatsList, nodestats)
+					nodestats.Usage_memory_percent = float32(nodestats.Usage_memory) / float32(nodestats.Capacity_memory) * 100
 
-					case "cpu":
-						Capacity_cpu, err := strconv.Atoi(node.Status.Capacity.Cpu().String())
-						// Converting to millicore 1 CPU 1000 millicore
-						nodestats.Capacity_cpu = Capacity_cpu * 1000
-						if err != nil {
-							fmt.Println("Error converting CPU capacity")
-						}
-						// fmt.Println("Capacity CPU:", nodestats.Capacity_cpu * 1000)
+					NodeStatsList = append(NodeStatsList, nodestats)
 
-						cpu_in_nanocore, err := strconv.ParseFloat(strings.TrimSuffix(nm.Usage.Cpu().String(), "n"), 32); if err == nil {
-							cpu_in_millicore := cpu_in_nanocore / 1000000
-							nodestats.Usage_cpu = float32(cpu_in_millicore)
-							// fmt.Println("Usage CPU:", nodestats.Usage_cpu)
-						} else {
-							// fmt.Println("Error converting CPU usage to millicore")
-						}
+				case "cpu":
+					Capacity_cpu, err := strconv.Atoi(node.Status.Capacity.Cpu().String())
+					// Converting to millicore 1 CPU 1000 millicore
+					nodestats.Capacity_cpu = Capacity_cpu * 1000
+					if err != nil {
+						fmt.Println("Error converting CPU capacity")
+					}
+					// fmt.Println("Capacity CPU:", nodestats.Capacity_cpu * 1000)
 
-						nodestats.Usage_cpu_percent = nodestats.Usage_cpu / float32(nodestats.Capacity_cpu) * 100
-						// fmt.Println("Usage CPU Percent:", nodestats.Usage_cpu_percent)
+					cpu_in_nanocore, err := strconv.ParseFloat(strings.TrimSuffix(nm.Usage.Cpu().String(), "n"), 32)
+					if err == nil {
+						cpu_in_millicore := cpu_in_nanocore / 1000000
+						nodestats.Usage_cpu = float32(cpu_in_millicore)
+						nodestats.Free_cpu = float32(nodestats.Capacity_cpu) - nodestats.Usage_cpu
+					} else {
+						// fmt.Println("Error converting CPU usage to millicore")
+					}
 
-					
-						NodeStatsList = append(NodeStatsList, nodestats)
+					nodestats.Usage_cpu_percent = nodestats.Usage_cpu / float32(nodestats.Capacity_cpu) * 100
+					// fmt.Println("Usage CPU Percent:", nodestats.Usage_cpu_percent)
 
-					case "disk":
+					NodeStatsList = append(NodeStatsList, nodestats)
 
-						// Ki - Kibibyte - 1024 bytes
-						nodestats.Capacity_disk, err = strconv.Atoi(strings.TrimSuffix(node.Status.Capacity.StorageEphemeral().String(), "Ki"))
-						if err != nil {
-							fmt.Println("Error converting Disk capacity")
-						}
-						// fmt.Println("Capacity Disk:", nodestats.Capacity_disk)
-						
-						// Disk usage is taken from Node Status Allocatable - not from Node Metrics
-						// the result would be on bytes - need to convert to Ki
-						// fmt.Println(node.Status.Allocatable.StorageEphemeral().String())
-						if diskusage, err := strconv.Atoi(node.Status.Allocatable.StorageEphemeral().String()); err == nil {
-							nodestats.Usage_disk = diskusage / 1024
-							// fmt.Println("Usage Disk:", nodestats.Usage_disk)	
-						} else {
-							fmt.Println("Error converting Disk usage")
-						}
+				case "disk":
 
-						nodestats.Usage_disk_percent = float32(nodestats.Usage_disk) / float32(nodestats.Capacity_disk) * 100
+					// Ki - Kibibyte - 1024 bytes
+					nodestats.Capacity_disk, err = strconv.Atoi(strings.TrimSuffix(node.Status.Capacity.StorageEphemeral().String(), "Ki"))
+					if err != nil {
+						fmt.Println("Error converting Disk capacity")
+					}
+					// fmt.Println("Capacity Disk:", nodestats.Capacity_disk)
 
-						// Since we are dividing the allocatable / capacity - the result would be the free space so we need to subtract it from 100 to get the usage
-						nodestats.Usage_disk_percent = 100 - nodestats.Usage_disk_percent
-						// fmt.Println("Usage Disk Percent:", nodestats.Usage_disk_percent)
+					// Disk usage is taken from Node Status Allocatable - not from Node Metrics
+					// the result would be on bytes - need to convert to Ki
+					// fmt.Println(node.Status.Allocatable.StorageEphemeral().String())
+					if diskfree, err := strconv.Atoi(node.Status.Allocatable.StorageEphemeral().String()); err == nil {
+						nodestats.Free_disk = diskfree / 1024
+						nodestats.Usage_disk = nodestats.Capacity_disk - nodestats.Free_disk
+					} else {
+						fmt.Println("Error converting Disk usage")
+					}
 
-						NodeStatsList = append(NodeStatsList, nodestats)
+					nodestats.Usage_disk_percent = float32(nodestats.Usage_disk) / float32(nodestats.Capacity_disk) * 100
+
+					NodeStatsList = append(NodeStatsList, nodestats)
 				}
 			}
-			
-			
+
 		}
 	}
+
+	utils.Logger.Debug(NodeStatsList)
 	return NodeStatsList
-	// fmt.Println(NodeStatsList)
+
 }

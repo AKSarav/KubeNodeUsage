@@ -3,10 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"kubenodeusage/k8s"
 	"kubenodeusage/utils"
 	"os"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,21 +19,15 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const (
-	padding  = 2
-	maxWidth = 80
-)
-
 var helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")).Render
+
 // map of keys of string type and values of interface type
 // Keys are strings.
 // Values can be of any type.
 
-
-
 /*
-	Function: usage
-	Description: print usage
+Function: usage
+Description: print usage
 */
 func usage() {
 	fmt.Println("Usage: go run main.go [options]")
@@ -39,17 +35,18 @@ func usage() {
 	// print in fine columns with fixed width
 	displayfmt := "%-20s %-20s\n"
 	fmt.Printf(displayfmt, "  --help", "to display help")
-	fmt.Printf(displayfmt, "  --sortby", "sort by memory, usage, color, name")
-	fmt.Printf(displayfmt, "  --filternodes", "filter nodes based on their name")
-	fmt.Printf(displayfmt, "  --filtercolor", "filter nodes based on their color")
-	fmt.Printf(displayfmt, "  --filterlabels", "filter nodes based on their labels")
+	fmt.Printf(displayfmt, "  --sortby", "sort by ", utils.PrintValidSorts)
+	fmt.Printf(displayfmt, "  --filternodes", "filter based on node name")
+	fmt.Printf(displayfmt, "  --filtercolor", "filter based on color category <30 Green, >30 <70 Orange, >70 Red")
+	fmt.Printf(displayfmt, "  --filterlabels", "filter based on labels")
 	fmt.Printf(displayfmt, "  --desc", "to enable reverse sort")
 	fmt.Printf(displayfmt, "  --debug", "enable debug mode")
-	fmt.Printf(displayfmt, "  --metrics", "choose which metrics to display (memory, usage, disk, all)")
+	fmt.Printf(displayfmt, "  --metrics", "choose which metrics", utils.PrintValidMetrics())
 	os.Exit(1)
 }
 
-func PrintArgs(args Inputs){
+// PrintArgs is used for Printing an arguments/*
+func PrintArgs(args Inputs) {
 	// print key value pairs
 	t := reflect.TypeOf(args)
 	v := reflect.ValueOf(args)
@@ -64,92 +61,129 @@ func PrintArgs(args Inputs){
 
 }
 
-func DebugView(m model, output *strings.Builder){
+func DebugView(m model, output *strings.Builder) {
 	if m.args.debug {
-		fmt.Fprintf(output,"\nDebug mode enabled")
-		fmt.Println(output,"\nArgs: ", m.args)
-		fmt.Println(output,"\nNodes: ", m.nodestats)
+		fmt.Fprint(output, " \nDebug mode enabled")
+		fmt.Fprint(output, "\nArgs: ", m.args)
+		fmt.Fprint(output, "\nNodes: ", m.nodestats)
 	}
 }
 
+func RightMetric(m model, index int) float32 {
 
-func RightMetric(m model,index int)(float32){
-	switch m.args.metrics{
-		case "memory":
-			if m.args.sortby == "used" { 
-				return float32(m.nodestats[index].Usage_memory)
-			}else if m.args.sortby == "capacity" {
-				return float32(m.nodestats[index].Capacity_memory)
-			} else if m.args.sortby == "color" {
-				return m.nodestats[index].Usage_memory_percent
-			}
-		case "cpu":
-			if m.args.sortby == "used" { 
-				return float32(m.nodestats[index].Usage_cpu)
-			}else if m.args.sortby == "capacity" {
-				return float32(m.nodestats[index].Capacity_cpu)
-			}else if m.args.sortby == "color" {
-				return m.nodestats[index].Usage_cpu_percent
-			}
-		case "disk":
-			if m.args.sortby == "used" { 
-			return float32(m.nodestats[index].Usage_disk)
-			} else if m.args.sortby == "capacity" {
-				return float32(m.nodestats[index].Capacity_disk)
-			} else if m.args.sortby == "color" {
-				return m.nodestats[index].Usage_disk_percent
-			}
-		default:
+	switch m.args.metrics {
+	case "memory":
+		if m.args.sortby == "free" {
+			return float32(m.nodestats[index].Free_memory)
+		} else if m.args.sortby == "capacity" || m.args.sortby == "max" {
+			return float32(m.nodestats[index].Capacity_memory)
+		} else if m.args.sortby == "color" || m.args.sortby == "usage" {
 			return m.nodestats[index].Usage_memory_percent
+		}
+	case "cpu":
+		if m.args.sortby == "free" {
+			return float32(m.nodestats[index].Free_cpu)
+		} else if m.args.sortby == "capacity" || m.args.sortby == "max" {
+			return float32(m.nodestats[index].Capacity_cpu)
+		} else if m.args.sortby == "color" || m.args.sortby == "usage" {
+			return m.nodestats[index].Usage_cpu_percent
+		}
+	case "disk":
+		if m.args.sortby == "free" {
+			return float32(m.nodestats[index].Free_disk)
+		} else if m.args.sortby == "capacity" || m.args.sortby == "max" {
+			return float32(m.nodestats[index].Capacity_disk)
+		} else if m.args.sortby == "color" || m.args.sortby == "usage" {
+			return m.nodestats[index].Usage_disk_percent
+		}
 	}
+	// default return
 	return m.nodestats[index].Usage_memory_percent
 }
 
+func SortByHandler(m model) {
 
-func SortByHandler(m model){
-
-	if m.args.sortby != ""{
-		if !m.args.reverseFlag{
-			sort.Slice(m.nodestats, func (i, j int) bool {
-				return RightMetric(m,i) < RightMetric(m,j)
-			})
-		} else{
+	if m.args.sortby != "" && m.args.sortby != "name" && m.args.sortby != "node" {
+		if !m.args.reverseFlag {
 			sort.Slice(m.nodestats, func(i, j int) bool {
-				return RightMetric(m,i) > RightMetric(m,j)
+				return RightMetric(m, i) < RightMetric(m, j)
+			})
+		} else {
+			sort.Slice(m.nodestats, func(i, j int) bool {
+				return RightMetric(m, i) > RightMetric(m, j)
 			})
 		}
-	} 
+	} else if m.args.sortby != "name" || m.args.sortby != "node" {
+		if !m.args.reverseFlag {
+			sort.Slice(m.nodestats, func(i, j int) bool {
+				return m.nodestats[i].Name < m.nodestats[j].Name
+			})
+		} else {
+			sort.Slice(m.nodestats, func(i, j int) bool {
+				return m.nodestats[i].Name > m.nodestats[j].Name
+			})
+		}
+	}
 
-	// // sort based on the sortby flag
-	// if m.args.sortby == "usage" || m.args.sortby == "color"  {
-	// 	if !m.args.reverseFlag{
-	// 		sort.Slice(m.nodestats, func(i, j int) bool {
-	// 			return RightMetric(m,i) < RightMetric(m,j)
-	// 		})
-	// 	} else{
-	// 		sort.Slice(m.nodestats, func(i, j int) bool {
-	// 			return RightMetric(m,i) > RightMetric(m,j)
-	// 		})
-	// 	}
-		
-	// } else if m.args.sortby == "name" {
-	// 	if !m.args.reverseFlag{
-	// 		sort.Slice(m.nodestats, func(i, j int) bool {
-	// 			return m.nodestats[i].Name < m.nodestats[j].Name
-	// 		})
-	// 	} else{
-	// 		sort.Slice(m.nodestats, func(i, j int) bool {
-	// 			return m.nodestats[i].Name > m.nodestats[j].Name
-	// 		})
-	// 	}
-	// } else if m.args.sortby == "capacity" {
-	// }
+}
+func ApplyFilters(m model) []k8s.Node {
+	if m.args.filterlabels != "" {
+		return FilterForLabel(m)
+	} else if m.args.filternodes != "" {
+		return FilterForNode(m)
+	} else if m.args.filtercolor != "" {
+		return FilterForColor(m)
+	} else {
+		return FilterForColor(m)
+	}
 }
 
-func FilterForColor(m *model) []k8s.Node {
-	if m.args.debug{
-		fmt.Println("Filter For Color called")
+func FilterForNode(m model) []k8s.Node {
+	var filteredNodes []k8s.Node
+	FilterNodeInput := strings.Split(m.args.filternodes, ",")
+
+	// Creating a new map to store the values of NodeStats list
+	// Choosing Map over Nested Array for comparision is best for TimeComplexity
+	//NodesMap := make(map[string]k8s.Node)
+
+	for _, node := range m.nodestats {
+		// NodesMap[node.Name] = node
+		for _, FilteredNode := range FilterNodeInput {
+			if matched, _ := regexp.MatchString(FilteredNode, node.Name); matched {
+				filteredNodes = append(filteredNodes, node)
+			}
+		}
 	}
+
+	//to-do Regex search of the nodes in FilterNodes
+	//for _, FilteredNode := range FilterNodeInput {
+	//	// if item, Exists or not := Map
+	//	if Node, NodeExists := NodesMap[FilteredNode]; NodeExists {
+	//		filteredNodes = append(filteredNodes, Node)
+	//	}
+	//}
+
+	if len(filteredNodes) > 0 {
+		utils.Logger.Debug("Filter For Node results", filteredNodes)
+		m.nodestats = filteredNodes
+		return m.nodestats
+	} else {
+		utils.Logger.Errorf("No matching Nodes found.. Exiting")
+		os.Exit(2)
+		return m.nodestats
+	}
+
+}
+
+func FilterForLabel(m model) []k8s.Node {
+	var filteredNodes []k8s.Node
+	FilterLabelInput := strings.Split(m.args.filternodes, ",")
+	utils.Logger.Debug("Filter For Node results", FilterLabelInput)
+	return filteredNodes
+}
+
+func FilterForColor(m model) []k8s.Node {
+	utils.Logger.Debug("Filter for Color called")
 	var filteredNodes []k8s.Node
 	var thresholdMin, thresholdMax float64
 
@@ -169,8 +203,6 @@ func FilterForColor(m *model) []k8s.Node {
 		thresholdMax = 100
 	}
 
-	// fmt.Printf("Final Min %f and Max %f",thresholdMin,thresholdMax)
-
 	// Filter nodes based on metric and threshold values
 	for _, node := range m.nodestats {
 		// fmt.Printf("Checking node %s and selected metric %s",string(node.Name), string(m.args.metrics))
@@ -183,8 +215,8 @@ func FilterForColor(m *model) []k8s.Node {
 		case "disk":
 			usagepercent = float64(node.Usage_disk_percent) / 100.0
 		default:
-			if m.args.debug{
-				fmt.Println("No Matching Metric",m.args.metrics)
+			if m.args.debug {
+				fmt.Println("No Matching Metric", m.args.metrics)
 			}
 		}
 
@@ -192,151 +224,184 @@ func FilterForColor(m *model) []k8s.Node {
 			filteredNodes = append(filteredNodes, node)
 		}
 	}
-	if m.args.debug{
-		fmt.Println("Filter For Color result:",filteredNodes)
+	if m.args.debug {
+		fmt.Println("Filter For Color result:", filteredNodes)
 	}
 	return filteredNodes
+
 }
 
-func PrintDesign(output *strings.Builder,maxNameWidth int){
+func PrintDesign(output *strings.Builder, maxNameWidth int) {
 	lines := strings.Repeat("-", maxNameWidth+12+12+20)
-	fmt.Fprintf(output, lines)
-	fmt.Fprintf(output,"\n")
+	fmt.Fprint(output, lines)
+	fmt.Fprint(output, "\n")
 }
 
-func MetricsHandler(m model, output *strings.Builder){
+func FilterForNodeName(m *model) {
+	if m.args.filternodes != "" {
 
-	
+	} else {
+		return
+	}
+}
+
+func MetricsHandler(m model, output *strings.Builder) {
 
 	// Nodes Filtering based on filters
-	filteredNodes := FilterForColor(&m)
+	filteredNodes := ApplyFilters(m)
 
-	// decide formatting
+	m.nodestats = filteredNodes
+	SortByHandler(m)
+
+	// decide formatting and Maximum width
 	maxNameWidth := 35
-	for _, node := range filteredNodes{
-		if maxNameWidth < len(node.Name){
+	for _, node := range filteredNodes {
+		if maxNameWidth < len(node.Name) {
 			maxNameWidth = len(node.Name)
 		}
 	}
-	format := "%-"+strconv.Itoa(maxNameWidth)+"s %-12s %-12s %s\n"
-	fmt.Fprintf(output,"\n# KubeNodeUsage\n# Version: 3\n# https://github.com/AKSarav/Kube-Node-Usage\n\n")
+	format := "%-" + strconv.Itoa(maxNameWidth) + "s %-12s %-12s %s\n"
+
+	// Header and Version info
+	fmt.Fprint(output, "\n# KubeNodeUsage\n# Version: 3\n# https://github.com/AKSarav/Kube-Node-Usage\n\n")
+
 	if m.args.metrics == "memory" {
-		fmt.Fprintf(output,"Memory Metrics\n\n")
-		fmt.Fprintf(output, format, "Name", "Used(GB)", "Max(GB)", "Usage %")
+		fmt.Fprint(output, "Memory Metrics\n\n")
+		fmt.Fprintf(output, format, "Name", "Free(MB)", "Max(MB)", "Usage %")
 		PrintDesign(output, maxNameWidth)
-	
+
 		for _, node := range filteredNodes {
-			prog := GetBar(float64(node.Usage_memory_percent)/100.0)
+			prog := GetBar(float64(node.Usage_memory_percent) / 100.0)
 			fmt.Fprintf(output, format,
-				node.Name, strconv.Itoa(node.Usage_memory/1024/1024), strconv.Itoa(node.Capacity_memory/1024/1024), prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
-			}
+				node.Name, strconv.Itoa(node.Free_memory/1024), strconv.Itoa(node.Capacity_memory/1024), prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
+		}
 	} else if m.args.metrics == "cpu" {
-		fmt.Fprintf(output,"CPU Metrics\n\n")
-		fmt.Fprintf(output, format,"Name", "Used(Cores)", "Max(Cores)", "Usage %")
+		fmt.Fprint(output, "CPU Metrics\n\n")
+		fmt.Fprintf(output, format, "Name", "Free(Cores)", "Max(Cores)", "Usage %")
 		PrintDesign(output, maxNameWidth)
 		for _, node := range filteredNodes {
-			prog := GetBar(float64(node.Usage_cpu_percent)/100.0)
+			prog := GetBar(float64(node.Usage_cpu_percent) / 100.0)
 			fmt.Fprintf(output, format,
-				node.Name, strconv.Itoa(int(node.Usage_cpu)), strconv.Itoa(node.Capacity_cpu), prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
-			}
+				node.Name, strconv.Itoa(int(node.Free_cpu)), strconv.Itoa(node.Capacity_cpu), prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
+		}
 	} else if m.args.metrics == "disk" {
-		fmt.Fprintf(output,"Disk Metrics\n\n")
-		fmt.Fprintf(output, format,"Name", "Used(GB)", "Max(GB)", "Usage %")
+		fmt.Fprint(output, "Disk Metrics\n\n")
+		fmt.Fprintf(output, format, "Name", "Free(GB)", "Max(GB)", "Usage %")
 		PrintDesign(output, maxNameWidth)
 		for _, node := range filteredNodes {
-			prog := GetBar(float64(node.Usage_disk_percent)/100.0)
+			prog := GetBar(float64(node.Usage_disk_percent) / 100.0)
 			fmt.Fprintf(output, format,
-				node.Name, strconv.Itoa(node.Usage_disk/1024/1024), strconv.Itoa(node.Capacity_disk/1024/1024), prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
-			}
+				node.Name, strconv.Itoa(node.Free_disk/1024/1024), strconv.Itoa(node.Capacity_disk/1024/1024), prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
+		}
 
 	} else if m.args.metrics == "all" {
 		fmt.Println("All Metrics")
 	}
 }
 
-func checkinputs(args *Inputs){
+func checkinputs(args *Inputs) {
+
+	IsAllFiltersOn(args)
 
 	if args.filtercolor != "" {
-		if !utils.IsValidColor(args.filtercolor){
-			fmt.Println("Not a valid color please choose one of the following colors",utils.PrintValidColors())
+		if !utils.IsValidColor(args.filtercolor) {
+			fmt.Println("Not a valid color please choose one of the following colors", utils.PrintValidColors())
 			os.Exit(2)
 		}
 	}
 
-	if args.metrics != ""{
-		if !utils.IsValidMetric(args.metrics){
-			fmt.Println("Not a valid Metric please choose one of",utils.PrintValidMetrics())
+	if args.metrics != "" {
+		if !utils.IsValidMetric(args.metrics) {
+			fmt.Println("Not a valid Metric please choose one of", utils.PrintValidMetrics())
 			os.Exit(2)
 		}
 	}
 
 	if args.sortby != "" {
-		if !utils.IsValidSort(args.sortby){
-			fmt.Println("Not a valid Sort by option please choose one of",utils.PrintValidSorts())
+		if !utils.IsValidSort(args.sortby) {
+			fmt.Println("Not a valid Sort by option please choose one of", utils.PrintValidSorts())
 			os.Exit(2)
 		}
 	}
 }
+
 type Inputs struct {
-	helpFlag bool
-	reverseFlag bool
-	debug bool
-	sortby string
-	filternodes string
-	filtercolor string
+	helpFlag     bool
+	reverseFlag  bool
+	debug        bool
+	sortby       string
+	filternodes  string
+	filtercolor  string
 	filterlabels string
-	metrics string
+	metrics      string
+}
+
+func IsAllFiltersOn(args *Inputs) {
+
+	var tempList []string
+	tempList = append(tempList, args.filterlabels, args.filternodes, args.filtercolor)
+	filtersIntegrityValue := 0
+	for _, filter := range tempList {
+		if filter != "" {
+			filtersIntegrityValue++
+		}
+	}
+	if filtersIntegrityValue > 1 {
+		fmt.Println("Only one filter can be used at a time")
+		os.Exit(2)
+	}
 }
 
 /*
-	Function: main
-	Description: main function
+Function: main
+Description: main function
 */
 func main() {
-
 
 	// clearScreen()
 	// parse command line arguments
 	var (
-		helpFlag bool
-		reverseFlag bool
-		debug bool
-		sortby string
-		filternodes string
-		filtercolor string
+		helpFlag     bool
+		reverseFlag  bool
+		debug        bool
+		sortby       string
+		filternodes  string
+		filtercolor  string
 		filterlabels string
-		metrics string
+		metrics      string
 	)
 
 	flag.BoolVar(&helpFlag, "help", false, "to display help")
 	flag.BoolVar(&reverseFlag, "desc", false, "to display sort in descending order")
 	flag.BoolVar(&debug, "debug", false, "enable debug mode")
-	flag.StringVar(&sortby, "sortby", "", "sort by capacity, usage, color, name")
-	flag.StringVar(&filternodes, "filternodes", "", "filter nodes based on their name")
-	flag.StringVar(&filtercolor, "filtercolor", "", "filter nodes based on their color")
-	flag.StringVar(&filterlabels, "filterlabels", "", "filter nodes based on their labels")
-	flag.StringVar(&metrics, "metrics", "all", "choose which metrics to display (memory, usage, disk, all)")
+	flag.StringVar(&sortby, "sortby", "name", "sort by name, free, capacity, usage")
+	flag.StringVar(&filternodes, "filternodes", "", "filter nodes based on name")
+	flag.StringVar(&filtercolor, "filtercolor", "", "filter nodes based on color")
+	flag.StringVar(&filterlabels, "filterlabels", "", "filter nodes based on labels")
+	flag.StringVar(&metrics, "metrics", "memory", "choose which metrics to display (memory, cpu, disk)")
 	flag.Parse()
-
 
 	if helpFlag {
 		usage()
 	}
 
+	if debug {
+		utils.InitLogger()
+		utils.Logger.SetLevel(logrus.DebugLevel)
+	}
 	args := Inputs{
-		helpFlag: helpFlag,
-		reverseFlag: reverseFlag,
-		debug: debug,
-		sortby: sortby,
-		filternodes: filternodes,
-		filtercolor: filtercolor,
+		helpFlag:     helpFlag,
+		reverseFlag:  reverseFlag,
+		debug:        debug,
+		sortby:       sortby,
+		filternodes:  filternodes,
+		filtercolor:  filtercolor,
 		filterlabels: filterlabels,
-		metrics: metrics,
+		metrics:      metrics,
 	}
 
-	
 	checkinputs(&args) // sending the args using Address of Operator
-	
+
 	if debug {
 		PrintArgs(args)
 	}
@@ -357,7 +422,7 @@ type tickMsg time.Time
 // model is the Bubble Tea model.
 type model struct {
 	nodestats []k8s.Node
-	args *Inputs
+	args      *Inputs
 }
 
 // Init Bubble Tea model
@@ -372,7 +437,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Type == tea.KeyCtrlC {
 			fmt.Println("Ctrl+C pressed")
 			return m, tea.Quit
-		} 
+		}
 		//  check if Q or q is pressed
 		if msg.Type == tea.KeyRunes && (msg.Runes[0] == 'Q' || msg.Runes[0] == 'q') {
 			fmt.Println("Q or q pressed")
@@ -394,44 +459,40 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 }
 
-
-func GetBar(decider float64) (progress.Model) {
+func GetBar(decider float64) progress.Model {
 
 	decider = decider * 100
 
 	var prog progress.Model
 	// decide which color to use based on the usage percentage below 30% is green, above 70% is red, else yellow
-	if  decider < 30 {
-		prog = progress.New(progress.WithScaledGradient("#13B013","#1FE51F"))
+	if decider < 30 {
+		prog = progress.New(progress.WithScaledGradient("#0bad5d", "#74b03f"))
 	} else if decider > 70 {
-		prog = progress.New(progress.WithScaledGradient("#13B013","#F11658"))
+		prog = progress.New(progress.WithScaledGradient("#13B013", "#F11658"))
 	} else {
-		prog = progress.New(progress.WithScaledGradient("#13B013","#F18016"))
+		prog = progress.New(progress.WithScaledGradient("#13B013", "#F18016"))
 	}
 	return prog
 }
 
 // View renders bubble tea
 func (m model) View() string {
-	
+
 	var output strings.Builder
-    
+
 	DebugView(m, &output) // If debug on this would print Node and arg details
 
-	SortByHandler(m)
-
 	MetricsHandler(m, &output)
-   
-	output.WriteString("\n"+helpStyle("Press any key to quit"))
-	
+
+	output.WriteString("\n" + helpStyle("Press any key to quit"))
+
 	return output.String()
 
 }
 
-
 // tickCmd returns a command that sends a tick every second.
 func tickCmd() tea.Cmd {
-	return tea.Tick(time.Second * 1, func(t time.Time) tea.Msg {
+	return tea.Tick(time.Second*1, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }
