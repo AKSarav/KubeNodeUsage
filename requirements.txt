@@ -1,2 +1,0 @@
-python-utils==3.4.5
-tqdm==4.64.1
