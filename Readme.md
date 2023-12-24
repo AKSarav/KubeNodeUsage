@@ -1,13 +1,57 @@
+
 # KubeNodeUsage
+
+![Alt text](KubeNodeUsage.png)
 
 KubeNodeUsage is a tool designed to provide insights into Kubernetes node usage. It offers various options for customization to help you analyze and filter node metrics effectively.
 
-> This is a beta release - feel free to report bugs and feature requests
+KubeNodeUsage use your local KubeConfig file to connect to the cluster and use Kubernetes API directly using Kubernetes GO SDK
 
+It fetch the Node Metrics from Kubernetes API and apply filters and aggreations to display it in a nice human readable Graphical format as Bar Charts.
+
+It has lot of capabilities to filter the output based on
+
+* NodeName
+* Usage
+* Free/Availability of Disk,CPU, Memory
+* Max/Capacity of Disk,CPU,Memory
+* Color - We use Green, Red and Orange to represent the usage 
+  * Green - Below 30% Usage 
+  * Orange - Between 30% to 70% Usage
+  * Red - Above 70% Usage
+
+Here is a quick demo recorded with Live Kubernetes Cluster
+
+![Alt text](KubeNodeUsage-demo.gif)
+
+
+&nbsp;
+
+## Kubernetes Supported Versions / Clusters
+
+As KubeNodeUsage use the Kubernetes Go SDK and directly connects to the API - It supports all the Kubernetes cluster which supports `.kube/config` file based authentication 
+
+**Clusters**
+
+I have tested it with the following K8s clusters
+
+* EKS - Elastic Kubernetes Service from AWS
+* Azure Kubernetes Service
+* GKE - Google Kubernetes Engine
+* Minikube
+* Kind Cluster
+
+**Versions**
+
+I have tested KubeNodeUsage starting from **1.19 - 1.28** ( the latest stable version as of Dec2023)
+
+&nbsp;
 
 ## Download
 
 You can clone this project or download the suitable binary from releases directory
+
+&nbsp;
 
 ## Usage
 
@@ -15,6 +59,7 @@ You can clone this project or download the suitable binary from releases directo
 KubeNodeUsage [options]
 ```
 
+&nbsp;
 ## Options
 
 - help: Display help information.
@@ -51,7 +96,7 @@ KubeNodeUsage [options]
     - capacity (Sort by resource capacity)
     - max (Sort by maximum resource value, same as 'capacity')
 
-
+&nbsp;
 ## Examples:
 
 ```bash
@@ -101,8 +146,18 @@ KubeNodeUsage --metrics=cpu --filtercolor=orange --filternodes=".*172-31.*"
 KubeNodeUsage --sortby=name --filternodes="app.*" --debug
 
 ```
-
+&nbsp;
 ## Todo
 
 * `FilterLabels` Filter by Label feature to be added
 * Pod Usage stats to be added as a feature
+
+&nbsp;
+
+#### Contributions are welcome
+
+Feel free to send your Pull requests and Issues to make this better.
+
+&nbsp;
+
+>Please share and Leave a **Github Star** if you like KubeNodeUsage - It would motivate me
