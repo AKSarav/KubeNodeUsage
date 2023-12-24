@@ -1,217 +1,163 @@
 
-# Kube Node Usage
+# KubeNodeUsage
 
 ![Alt text](KubeNodeUsage.png)
 
+KubeNodeUsage is a tool designed to provide insights into Kubernetes node usage. It offers various options for customization to help you analyze and filter node metrics effectively.
 
-**Kubernetes Node Usage** or **Kube-Node-Usage** is a CLI tool to get the Memory, CPU and Disk Usage of Kubernetes Nodes
+KubeNodeUsage use your local KubeConfig file to connect to the cluster and use Kubernetes API directly using Kubernetes GO SDK
 
-it is designed on python and relies on the `kubectl` installed in your local.
+It fetch the Node Metrics from Kubernetes API and apply filters and aggreations to display it in a nice human readable Graphical format as Bar Charts.
 
-No Authentication data are directly handled.
+It has lot of capabilities to filter the output based on
 
-You can think of `Kube-Node-Usage`  as a wrapper over `kubectl get nodes` and `kubectl top nodes` command
+* NodeName
+* Usage
+* Free/Availability of Disk,CPU, Memory
+* Max/Capacity of Disk,CPU,Memory
+* Color - We use Green, Red and Orange to represent the usage 
+  * Green - Below 30% Usage 
+  * Orange - Between 30% to 70% Usage
+  * Red - Above 70% Usage
 
-Kube-Node-Usage simply execute the `kubectl get nodes` and `kubectl top nodes` command and parse the output and present it to you with a nice formatting and Usage Bar with more filtering capabilities
+Here is a quick demo recorded with Live Kubernetes Cluster
+
+![Alt text](KubeNodeUsage-demo.gif)
+
 
 &nbsp;
 
-### Prerequisites
+## Kubernetes Supported Versions / Clusters
 
-1) `Kubectl` must be installed and configured 
-2) `Python3` must be installed and used to run the kube-node-usage
-3) `pip` package manager is required to install the necassary python packages
-4) Must have required Kubernetes Cluster accessr. As we have mentioned. kube-node-usage simply run the `kubectl get nodes` command and parse the output and present it to you.
-   
-&nbsp;
-### Release Notes of V2.0.0
+As KubeNodeUsage use the Kubernetes Go SDK and directly connects to the API - It supports all the Kubernetes cluster which supports `.kube/config` file based authentication 
 
-> We have changed the way we calculate the CPU and Memory Usage.
+**Clusters**
 
-Earlier we were using `kubectl get nodes` command to get the CPU and Memory Usage. But we noticed that the CPU and Memory Usage values are not accurate.
+I have tested it with the following K8s clusters
 
-Now we are using `kubectl top nodes` command to get the CPU and Memory Usage.
+* EKS - Elastic Kubernetes Service from AWS
+* Azure Kubernetes Service
+* GKE - Google Kubernetes Engine
+* Minikube
+* Kind Cluster
 
-> With this release we have added the following features
+**Versions**
 
+I have tested KubeNodeUsage starting from **1.19 - 1.28** ( the latest stable version as of Dec2023)
 
-1. Added the `--filternodes` option to filter the nodes based on the node name
-2. Added the `--filtercolors` option to filter the nodes based on the color of the usage bar
-3. Added the `--interval` option to set the interval between the refresh of the output
-4. Added a `--debug` option to print the debug messages
-5. Added clear screen before the output is printed
+&nbsp; 
 
-&nbsp;
-### Existing Features ( continued from V1)
+## Download
 
-1. List the Kubernetes Nodes with CPU `--cpu`, Memory `--memory`  and Disk `--memory` Usage
-2. with `--all` option you can list the nodes with all the above mentioned usage
-3. with `--sort` option you can sort the output based on the `node`, `max`, `free` and `usage` fields
-4. you can use `--reverse` option to sort the output in `descending` order
+You can clone this project or download the suitable binary from releases directory
 
 &nbsp;
-## List of Possible commands and options
 
-```
-usage: kube-node-usage.py [-h] [--cpu] [--memory] [--disk] [--all] [--sort SORT]
-                          [--reverse] [--filternodes SINGLE_NODE_NAME OR COMMA SEPARATED_NODE_NAMES]
-                          [--filtercolors SINGLE_COLOR OR COMMA SEPARATED_COLORS ] 
-                          [--interval SECONDS]
-                          [--debug]
-```
-### How to Set up / Install Kube-Node-Usage
+## Usage
 
-1. Clone the repository
-
-```
-git clone https://github.com/AKSarav/Kube-Node-Usage.git
+```bash
+KubeNodeUsage [options]
 ```
 
-2. Install the necassary packages with the following PIP command.
+&nbsp;
+## Options
 
-We presume you have pip and python3 installed
+- help: Display help information.
 
+- metrics: Choose which metric to display. Valid options include:
+
+    - memory
+    - disk
+    - cpu
+
+- filternodes: Filter nodes based on node name using a regular expression. (Note: Only one filter can be used at a time, and the input should be enclosed in quotes.)
+
+- filtercolor: Filter nodes based on color categories. Valid options include:
+
+    - red
+    - green
+    - orange
+
+- desc: Enable reverse sort order.
+
+- debug: Enable debug mode. ( Prints more logging for debug)
+
+
+- sortby: Sort the output by a specific metric. Valid options include:
+
+    - name (Sort by node name alphabetically)
+    - node (Sort by node name alphabetically, same as 'name')
+
+    - free (Sort by available resources)
+
+    - usage (Sort by resource usage)
+    - color (Sort by color category, same as usage)
+
+    - capacity (Sort by resource capacity)
+    - max (Sort by maximum resource value, same as 'capacity')
+
+&nbsp;
+## Examples:
+
+```bash
+# Display help information
+KubeNodeUsage --help
+
+# Display node usage with default settings (memory is the default metric)
+KubeNodeUsage
+
+# Display node usage sorted by node name
+KubeNodeUsage --sortby=name
+
+# Display node usage sorted by free resources in descending order
+KubeNodeUsage --sortby=free --desc
+
+# Display node usage sorted by usage in ascending order
+KubeNodeUsage --sortby=usage
+
+# Display node usage sorted by capacity in descending order
+KubeNodeUsage --sortby=capacity --desc
+
+# Filter nodes with a name starting with "web"
+KubeNodeUsage --filternodes="web.*"
+
+# Filter nodes with color category "green"
+KubeNodeUsage --filtercolor=green
+
+# Display memory usage for all nodes
+KubeNodeUsage --metrics=memory
+
+# Display disk usage for nodes with a name containing "data"
+KubeNodeUsage --metrics=disk --filternodes=".*data.*"
+
+# Show CPU usage for nodes with color category "red" in descending order
+KubeNodeUsage --metrics=cpu --filtercolor=red --desc
+
+# Display node usage sorted by maximum resource value in ascending order
+KubeNodeUsage --sortby=max
+
+# Display node usage sorted by capacity, show memory usage, and filter nodes with a name starting with "prod"
+KubeNodeUsage --sortby=capacity --metrics=memory --filternodes="prod.*"
+
+# Show CPU usage for nodes with color category "orange" and filter nodes with a name containing "IP range"
+KubeNodeUsage --metrics=cpu --filtercolor=orange --filternodes=".*172-31.*"
+
+# Display node usage sorted by name, filter nodes with a name starting with "app", and enable debug mode
+KubeNodeUsage --sortby=name --filternodes="app.*" --debug
 
 ```
-pip install -r requirements.txt
-```
-
-3. Execute the command to list the kubernetes nodes with their Usage Information
-
-<br/>
-<br/>
-
-For some reason, If you do not wish to install the required python packages into the entire system
-
-You can create your virtual environment (virtualenv) and install the packages
-
-Here are the commands for the same
-
-```
-# python -m venv venv
-# source venv/bin/activate
-# pip install -r requirements.txt
-```
-Once you have used the `kube-node-usage` you can execute the `deactivate` command
-
-```
-# deactivate
-```
-
-### How to use Kube-Node-Usage
-
-Here are the list of commands Kube-Node-Usage supports and how it can be used.
-
-
-```
-python3 kube-node-usage.py --memory --sort=name
-python3 kube-node-usage.py --memory --sort=node
-python3 kube-node-usage.py --memory --sort=free
-python3 kube-node-usage.py --memory --sort=max
-python3 kube-node-usage.py --memory --sort=usage
-python3 kube-node-usage.py --memory --sort=usage --reverse
-python3 kube-node-usage.py --memory --sort=usage --reverse --filtercolors=red
-python3 kube-node-usage.py --memory --sort=usage --reverse --filtercolors=red,yellow
-python3 kube-node-usage.py --memory --sort=usage --reverse --filtercolors=red,green
-python3 kube-node-usage.py --memory --sort=usage --reverse --filtercolors=red --interval=10
-python3 kube-node-usage.py --memory --sort=usage --reverse --filternodes=ip-172-31-23-94.ec2.internal
-python3 kube-node-usage.py --memory --sort=usage --reverse --filternodes=ip-172-31-23-94.ec2.internal,ip-172-31-25-7.ec2.internal
-python3 kube-node-usage.py --memory --sort=usage --reverse --filternodes=ip-172-31-23-94.ec2.internal,ip-172-31-25-7.ec2.internal --interval=10
-
-
-python3 kube-node-usage.py --cpu --sort=name
-python3 kube-node-usage.py --cpu --sort=node
-python3 kube-node-usage.py --cpu --sort=free
-python3 kube-node-usage.py --cpu --sort=max
-python3 kube-node-usage.py --cpu --sort=usage
-python3 kube-node-usage.py --cpu --sort=usage --reverse
-python3 kube-node-usage.py --cpu --sort=usage --reverse --filtercolors=red
-python3 kube-node-usage.py --cpu --sort=usage --reverse --filtercolors=red,yellow
-python3 kube-node-usage.py --cpu --sort=usage --reverse --filtercolors=red,green
-python3 kube-node-usage.py --cpu --sort=usage --reverse --filtercolors=red --interval=10
-python3 kube-node-usage.py --cpu --sort=usage --reverse --filternodes=ip-172-31-23-94.ec2.internal
-python3 kube-node-usage.py --cpu --sort=usage --reverse --filternodes=ip-172-31-23-94.ec2.internal,ip-172-31-25-7.ec2.internal
-python3 kube-node-usage.py --cpu --sort=usage --reverse --filternodes=ip-172-31-23-94.ec2.internal,ip-172-31-25-7.ec2.internal --interval=10
-
-
-python3 kube-node-usage.py --disk --sort=name
-python3 kube-node-usage.py --disk --sort=node
-python3 kube-node-usage.py --disk --sort=free
-python3 kube-node-usage.py --disk --sort=max
-python3 kube-node-usage.py --disk --sort=usage
-python3 kube-node-usage.py --disk --sort=usage --reverse
-python3 kube-node-usage.py --disk --sort=usage --reverse --filtercolors=red
-python3 kube-node-usage.py --disk --sort=usage --reverse --filtercolors=red,yellow
-python3 kube-node-usage.py --disk --sort=usage --reverse --filtercolors=red,green
-python3 kube-node-usage.py --disk --sort=usage --reverse --filtercolors=red --interval=10
-python3 kube-node-usage.py --disk --sort=usage --reverse --filternodes=ip-172-31-23-94.ec2.internal
-python3 kube-node-usage.py --disk --sort=usage --reverse --filternodes=ip-172-31-23-94.ec2.internal,ip-172-31-25-7.ec2.internal
-python3 kube-node-usage.py --disk --sort=usage --reverse --filternodes=ip-172-31-23-94.ec2.internal,ip-172-31-25-7.ec2.internal --interval=10
-
-
-
-python3 kube-node-usage.py --all --sort=name
-python3 kube-node-usage.py --all --sort=node
-python3 kube-node-usage.py --all --sort=free
-python3 kube-node-usage.py --all --sort=max
-python3 kube-node-usage.py --all --sort=usage
-python3 kube-node-usage.py --all --sort=usage --reverse
-python3 kube-node-usage.py --all --sort=usage --reverse --filtercolors=red
-python3 kube-node-usage.py --all --sort=usage --reverse --filtercolors=red,yellow
-python3 kube-node-usage.py --all --sort=usage --reverse --filtercolors=red,green
-python3 kube-node-usage.py --all --sort=usage --reverse --filtercolors=red --interval=10
-python3 kube-node-usage.py --all --sort=usage --reverse --filternodes=ip-172-31-23-94.ec2.internal
-python3 kube-node-usage.py --all --sort=usage --reverse --filternodes=ip-172-31-23-94.ec2.internal,ip-172-31-25-7.ec2.internal
-python3 kube-node-usage.py --all --sort=usage --reverse --filternodes=ip-172-31-23-94.ec2.internal,ip-172-31-25-7.ec2.internal --interval=10
-
-
-```
-
-### Screenshots 
-
-![alt text](KubeNodeUsage-cpu-sort-asc.png)
 &nbsp;
-![alt text](KubeNodeUsage-cpu-sort-desc.png)
-&nbsp;
-![alt text](KubeNodeUsage-disk-sort-asc.png)
-&nbsp;
-![alt text](KubeNodeUsage-disk-sort-desc.png)
-&nbsp;
-![alt text](KubeNodeUsage-memory-sort-desc.png)
-&nbsp;
-![alt text](KubeNodeUsage-memory-sort-asc.png)
-&nbsp;
-![alt text](KubeNodeUsage-withInterval.png)
-&nbsp;
-![alt text](KubeNodeUsage-FilterByColor.png)
-&nbsp;
-![alt text](KubeNodeUsage-FilterByNode.png)
+## Todo
+
+* `FilterLabels` Filter by Label feature to be added
+* Pod Usage stats to be added as a feature
+
 &nbsp;
 
+#### Contributions are welcome
 
+Feel free to send your Pull requests and Issues to make this better.
 
+&nbsp;
 
-
-
-
-### Pull requests and Issues are welcome
-
-Feel free to send your Pull requests to make this tool better.
-
-If you happen to see any issues. please create an issue and I will have it checked.
-
-
-</br>
-
-### If you like this tool. please let me know by clicking on the Github Stars 
-
-
-### How to reach me
-
-Linked in : https://www.linkedin.com/in/saravakdevopsjunction/
-Website: https://devopsjunction.com, https://middlewareinventory.com
-
-
-
-
-
+>Please share and Leave a **Github Star** if you like KubeNodeUsage - It would motivate me
