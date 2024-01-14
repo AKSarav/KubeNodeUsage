@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"kubenodeusage/k8s"
 	"kubenodeusage/utils"
 	"os"
@@ -13,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
@@ -484,7 +485,7 @@ func (m model) View() string {
 
 	MetricsHandler(m, &output)
 
-	output.WriteString("\n" + helpStyle("Press any key to quit"))
+	output.WriteString("\n" + helpStyle("Press Q or Ctrl+C to quit"))
 
 	return output.String()
 
