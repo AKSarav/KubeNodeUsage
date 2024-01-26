@@ -201,7 +201,7 @@ KubeNodeUsage --sortby=name --filternodes="app.*" --debug
 
 &nbsp;
 
-#### Contributions are welcome :handshake:
+### Contributions / Feature Requests are welcome :handshake:
 
 Feel free to send your Pull requests and Issues to make this better.
 
