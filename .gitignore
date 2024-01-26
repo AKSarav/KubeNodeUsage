@@ -4,3 +4,7 @@ venv/
 env/
 .DS_Store
 .idea/*
+releases/*
+*.exe
+*amd64
+*arm64

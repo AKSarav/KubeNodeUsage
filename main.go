@@ -265,7 +265,7 @@ func MetricsHandler(m model, output *strings.Builder) {
 
 	// Header and Version info
 	
-	fmt.Fprint(output, "\n# KubeNodeUsage\n# Version: 3\n# https://github.com/AKSarav/Kube-Node-Usage\n\n")
+	fmt.Fprint(output, "\n# KubeNodeUsage\n# Version: 3.0.1\n# https://github.com/AKSarav/Kube-Node-Usage\n\n")
 
 	fmt.Fprint(output, "\n# Context: ",m.clusterinfo.Context,"\n# Version: ",m.clusterinfo.Version,"\n# URL: ",m.clusterinfo.URL,"\n\n")
 
