@@ -99,15 +99,15 @@ unzip KubeNodeUsage-windows-386.exe.zip
 
 KubeNodeUsage is a command line utility with lot of startup options/flags 
 
-You can find the detail information on all available options here
-
 
 ```bash
 KubeNodeUsage [options]
 ```
 
+You can find the detail information on all available options here
+
 &nbsp;
-### Available Options :memo:
+**Available Options** :memo:
 
 - `help`: Display help information.
 
