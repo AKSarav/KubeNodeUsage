@@ -3,15 +3,16 @@ package k8s
 import (
 	"context"
 	"fmt"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
-	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 	"kubenodeusage/utils"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
 type Node struct {
@@ -30,7 +31,54 @@ type Node struct {
 	Usage_cpu_percent    float32
 }
 
+type Cluster struct{
+	Context string
+	Version string
+	URL		string
+}
+
 var NodeStatsList []Node
+var K8sinfo Cluster
+
+func ClusterInfo()(Cluster){
+	kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	confvar := clientcmd.GetConfigFromFileOrDie(kubeconfig);
+	
+	K8sinfo := Cluster{}
+	K8sinfo.Context = confvar.CurrentContext
+
+	utils.InitLogger()
+	
+
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		fmt.Println("Not able to access .kube/config file from the Home Directory path: ",kubeconfig)
+		os.Exit(2)
+	}
+	
+	mc, err := metricsv.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	K8sinfo.URL = config.Host
+
+	// Validate Version of Server
+	if version, err := mc.ServerVersion(); err != nil{
+		fmt.Println("\n# ERROR: Unable to Establish Connection to Kubernetes Cluster")
+		fmt.Println("# Kubernetes Context:",K8sinfo.Context)
+		fmt.Println("# Kubernetes URL:",K8sinfo.URL)
+		fmt.Println("# Please check your kubernetes configuration and permissions\n")
+		os.Exit(2)
+	} else{
+		K8sinfo.Version = version.String()
+	}
+
+	
+
+	return K8sinfo
+	
+}
 
 func Nodes(metric string) (NodeStatsList []Node) {
 
@@ -39,9 +87,10 @@ func Nodes(metric string) (NodeStatsList []Node) {
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		panic(err.Error())
+		fmt.Println("Not able to access .kube/config file from the Home Directory path: ",kubeconfig)
+		os.Exit(2)
 	}
-
+	
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err.Error())

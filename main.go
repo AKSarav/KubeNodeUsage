@@ -264,7 +264,10 @@ func MetricsHandler(m model, output *strings.Builder) {
 	format := "%-" + strconv.Itoa(maxNameWidth) + "s %-12s %-12s %s\n"
 
 	// Header and Version info
+	
 	fmt.Fprint(output, "\n# KubeNodeUsage\n# Version: 3\n# https://github.com/AKSarav/Kube-Node-Usage\n\n")
+
+	fmt.Fprint(output, "\n# Context: ",m.clusterinfo.Context,"\n# Version: ",m.clusterinfo.Version,"\n# URL: ",m.clusterinfo.URL,"\n\n")
 
 	if m.args.metrics == "memory" {
 		fmt.Fprint(output, "Memory Metrics\n\n")
@@ -407,10 +410,12 @@ func main() {
 		PrintArgs(args)
 	}
 
+	// Model Intialized here - Start of the Program
 	mdl := model{}
 	mdl.args = &args
+	mdl.clusterinfo = k8s.ClusterInfo()
 	mdl.nodestats = k8s.Nodes(metrics)
-
+	
 	if _, err := tea.NewProgram(mdl).Run(); err != nil {
 		fmt.Println("Oh no!", err)
 		os.Exit(1)
@@ -422,6 +427,7 @@ type tickMsg time.Time
 
 // model is the Bubble Tea model.
 type model struct {
+	clusterinfo k8s.Cluster
 	nodestats []k8s.Node
 	args      *Inputs
 }
@@ -445,13 +451,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
-		// check if R or R is pressed
-		if msg.Type == tea.KeyRunes && (msg.Runes[0] == 'R' || msg.Runes[0] == 'r') {
-			fmt.Println("R or r pressed")
-			m.nodestats = k8s.Nodes(m.args.metrics)
-			return m, tea.ClearScreen
-		}
+		// // check if R or R is pressed
+		// if msg.Type == tea.KeyRunes && (msg.Runes[0] == 'R' || msg.Runes[0] == 'r') {
+		// 	fmt.Println("R or r pressed")
+		// 	m.nodestats = k8s.Nodes(m.args.metrics)
+		// 	return m, tea.ClearScreen
+		// }
 	case tickMsg:
+		m.clusterinfo = k8s.ClusterInfo()
 		m.nodestats = k8s.Nodes(m.args.metrics)
 		return m, tea.Batch(tickCmd())
 
