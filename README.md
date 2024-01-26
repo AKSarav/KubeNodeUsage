@@ -47,13 +47,57 @@ I have tested KubeNodeUsage starting from **1.19 - 1.28** ( the latest stable ve
 
 &nbsp; 
 
+## How it Works
+
+KubeNodeUsage is written in `GoLang` and uses `client-go` and `kubernetes` SDK libraries
+
+When you start KubeNodeUsage - It try to read the `$HOME/.kube/config` file in your HOME directory
+
+KubeNodeUsage connects to the Default cluster set by the `CurrentContext` on the ./kube/config file
+
+You can manually edit this file and update it but the recommended way to update current-context is to use `kubectl config use-context`
+
+KubeNodeUsage does not use `kubectl` directly and it relies on the `.kube/config` file and the authentication method defined in there
+
+KubeNodeUsage works the same way - kubectl works based on the configuration information found on .kube/config file
+
+If the `kubectl`commands are not working - its highly likely KubeNodeUsage would fail too - In this case you have to check your Kube config file
+
+&nbsp; 
+
+#### Is it secure ? How about Data Privacy 
+KubeNodeUsage do not collect any data or send anywhere 
+
+KubeNodeUsage Source code is Public, Feel free to download and validate it yourself
+&nbsp;
+
 ## Download
 
-You can clone this project or download the suitable binary from releases directory
+You can clone this project and run it as shown below
+
+```
+git clone https://github.com/AKSarav/Kube-Node-Usage.git
+cd Kube-Node-Usage
+go run main.go
+```
+
+Or Download the Binaries from the Github release page
+
+Goto the https://github.com/AKSarav/Kube-Node-Usage/releases and download the suitable binary for your OS and use it
+
+```
+unzip KubeNodeUsage-windows-386.exe.zip
+./KubeNodeUsage-windows-386
+```
 
 &nbsp;
 
 ## Usage
+
+KubeNodeUsage is a command line utility with lot of startup options/flags 
+
+You can find the detail information on all available options here
+
 
 ```bash
 KubeNodeUsage [options]
@@ -160,4 +204,4 @@ Feel free to send your Pull requests and Issues to make this better.
 
 &nbsp;
 
->Please share and Leave a **Github Star** if you like KubeNodeUsage - It would motivate me
+>Please share and Leave a **Github Star** :star: :star: :star: :star:  if you like KubeNodeUsage - It would motivate me
