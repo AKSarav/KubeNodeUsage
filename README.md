@@ -1,9 +1,10 @@
 
 # KubeNodeUsage
 
-![Alt text](KubeNodeUsage.png)
+![Alt text](KubeNodeUsage-demo.gif)
 
-KubeNodeUsage is a tool designed to provide insights into Kubernetes node usage. It offers various options for customization to help you analyze and filter node metrics effectively.
+
+**KubeNodeUsage** is a tool designed to provide insights into Kubernetes node usage. It offers various options for customization to help you analyze and filter node metrics effectively.
 
 KubeNodeUsage use your local KubeConfig file to connect to the cluster and use Kubernetes API directly using Kubernetes GO SDK
 
@@ -20,14 +21,16 @@ It has lot of capabilities to filter the output based on
   * Orange - Between 30% to 70% Usage
   * Red - Above 70% Usage
 
-Here is a quick demo recorded with Live Kubernetes Cluster
 
-![Alt text](KubeNodeUsage-demo.gif)
+
+:sparkle: Screenshot of Latest Version 3.0.1 with Cluster Info 
+
+![Alt text](KubeNodeUsageV3.0.1.PNG)
 
 
 &nbsp;
 
-## Kubernetes Supported Versions / Clusters
+## Kubernetes Supported Versions / Clusters :white_check_mark:
 
 As KubeNodeUsage use the Kubernetes Go SDK and directly connects to the API - It supports all the Kubernetes cluster which supports `.kube/config` file based authentication 
 
@@ -47,7 +50,7 @@ I have tested KubeNodeUsage starting from **1.19 - 1.28** ( the latest stable ve
 
 &nbsp; 
 
-## How it Works
+## How it Works :bulb:
 
 KubeNodeUsage is written in `GoLang` and uses `client-go` and `kubernetes` SDK libraries
 
@@ -65,13 +68,13 @@ If the `kubectl`commands are not working - its highly likely KubeNodeUsage would
 
 &nbsp; 
 
-#### Is it secure ? How about Data Privacy 
+#### Is it secure ? How about Data Privacy :lock:
 KubeNodeUsage do not collect any data or send anywhere 
 
 KubeNodeUsage Source code is Public, Feel free to download and validate it yourself
 &nbsp;
 
-## Download
+## How to Download :arrow_double_down:
 
 You can clone this project and run it as shown below
 
@@ -92,7 +95,7 @@ unzip KubeNodeUsage-windows-386.exe.zip
 
 &nbsp;
 
-## Usage
+## How to use :book:
 
 KubeNodeUsage is a command line utility with lot of startup options/flags 
 
@@ -104,7 +107,7 @@ KubeNodeUsage [options]
 ```
 
 &nbsp;
-## Options
+#### Available Options :memo:
 
 - help: Display help information.
 
@@ -198,7 +201,7 @@ KubeNodeUsage --sortby=name --filternodes="app.*" --debug
 
 &nbsp;
 
-#### Contributions are welcome
+#### Contributions are welcome :handshake:
 
 Feel free to send your Pull requests and Issues to make this better.
 
