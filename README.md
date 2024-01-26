@@ -107,41 +107,41 @@ KubeNodeUsage [options]
 ```
 
 &nbsp;
-#### Available Options :memo:
+### Available Options :memo:
 
-- help: Display help information.
+- `help`: Display help information.
 
-- metrics: Choose which metric to display. Valid options include:
+- `metrics`: Choose which metric to display. Valid options include:
 
     - memory
     - disk
     - cpu
 
-- filternodes: Filter nodes based on node name using a regular expression. (Note: Only one filter can be used at a time, and the input should be enclosed in quotes.)
+- `filternodes`: Filter nodes based on node name using a regular expression. (Note: Only one filter can be used at a time, and the input should be enclosed in quotes.)
 
-- filtercolor: Filter nodes based on color categories. Valid options include:
+- `filtercolor`: Filter nodes based on color categories. Valid options include:
 
-    - red
-    - green
-    - orange
+    - `red` 
+    - `green`
+    - `orange`
 
-- desc: Enable reverse sort order.
+- `desc`: Enable reverse sort order.
 
-- debug: Enable debug mode. ( Prints more logging for debug)
+- `debug`: Enable debug mode. ( Prints more logging for debug)
 
 
-- sortby: Sort the output by a specific metric. Valid options include:
+- `sortby`: Sort the output by a specific metric. Valid options include:
 
-    - name (Sort by node name alphabetically)
-    - node (Sort by node name alphabetically, same as 'name')
+    - `name` (Sort by node name alphabetically)
+    - `node` (Sort by node name alphabetically, same as 'name')
 
-    - free (Sort by available resources)
+    - `free` (Sort by available resources)
 
-    - usage (Sort by resource usage)
-    - color (Sort by color category, same as usage)
+    - `usage` (Sort by resource usage)
+    - `color` (Sort by color category, same as usage)
 
-    - capacity (Sort by resource capacity)
-    - max (Sort by maximum resource value, same as 'capacity')
+    - `capacity` (Sort by resource capacity)
+    - `max` (Sort by maximum resource value, same as 'capacity')
 
 &nbsp;
 ## Examples:
