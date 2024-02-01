@@ -29,34 +29,33 @@ type Node struct {
 	Usage_disk_percent   float32
 	Usage_memory_percent float32
 	Usage_cpu_percent    float32
-	Labels map[string]string
+	Labels               map[string]string
 }
 
-type Cluster struct{
+type Cluster struct {
 	Context string
 	Version string
-	URL		string
+	URL     string
 }
 
 var NodeStatsList []Node
 var K8sinfo Cluster
 
-func ClusterInfo()(Cluster){
+func ClusterInfo() Cluster {
 	kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
-	confvar := clientcmd.GetConfigFromFileOrDie(kubeconfig);
-	
+	confvar := clientcmd.GetConfigFromFileOrDie(kubeconfig)
+
 	K8sinfo := Cluster{}
 	K8sinfo.Context = confvar.CurrentContext
 
 	utils.InitLogger()
-	
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		fmt.Println("Not able to access .kube/config file from the Home Directory path: ",kubeconfig)
+		fmt.Println("Not able to access .kube/config file from the Home Directory path: ", kubeconfig)
 		os.Exit(2)
 	}
-	
+
 	mc, err := metricsv.NewForConfig(config)
 	if err != nil {
 		panic(err.Error())
@@ -65,20 +64,18 @@ func ClusterInfo()(Cluster){
 	K8sinfo.URL = config.Host
 
 	// Validate Version of Server
-	if version, err := mc.ServerVersion(); err != nil{
+	if version, err := mc.ServerVersion(); err != nil {
 		fmt.Println("\n# ERROR: Unable to Establish Connection to Kubernetes Cluster")
-		fmt.Println("# Kubernetes Context:",K8sinfo.Context)
-		fmt.Println("# Kubernetes URL:",K8sinfo.URL)
+		fmt.Println("# Kubernetes Context:", K8sinfo.Context)
+		fmt.Println("# Kubernetes URL:", K8sinfo.URL)
 		fmt.Println("# Please check your kubernetes configuration and permissions\n")
 		os.Exit(2)
-	} else{
+	} else {
 		K8sinfo.Version = version.String()
 	}
 
-	
-
 	return K8sinfo
-	
+
 }
 
 func Nodes(metric string) (NodeStatsList []Node) {
@@ -88,10 +85,10 @@ func Nodes(metric string) (NodeStatsList []Node) {
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		fmt.Println("Not able to access .kube/config file from the Home Directory path: ",kubeconfig)
+		fmt.Println("Not able to access .kube/config file from the Home Directory path: ", kubeconfig)
 		os.Exit(2)
 	}
-	
+
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err.Error())
