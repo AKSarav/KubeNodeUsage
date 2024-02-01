@@ -192,11 +192,13 @@ KubeNodeUsage --metrics=cpu --filtercolor=orange --filternodes=".*172-31.*"
 # Display node usage sorted by name, filter nodes with a name starting with "app", and enable debug mode
 KubeNodeUsage --sortby=name --filternodes="app.*" --debug
 
+# Display node usage, filter for nodes with supplied labels
+KubeNodeUsage --filterlabels "beta.kubernetes.io/instance-type=m6idn.large,beta.kubernetes.io/os=linux"
+
 ```
 &nbsp;
 ## Todo
 
-* `FilterLabels` Filter by Label feature to be added
 * Pod Usage stats to be added as a feature
 
 &nbsp;

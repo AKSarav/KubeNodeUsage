@@ -29,6 +29,7 @@ type Node struct {
 	Usage_disk_percent   float32
 	Usage_memory_percent float32
 	Usage_cpu_percent    float32
+	Labels map[string]string
 }
 
 type Cluster struct{
@@ -132,6 +133,7 @@ func Nodes(metric string) (NodeStatsList []Node) {
 			if node.Name == nm.Name {
 				// fmt.Println("Node Name:", node.Name)
 				nodestats.Name = node.Name
+				nodestats.Labels = node.Labels
 
 				switch metric {
 				case "memory":
