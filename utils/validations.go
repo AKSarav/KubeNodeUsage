@@ -1,5 +1,7 @@
 package utils
 
+import "strings"
+
 var ValidColors = map[string]bool{
 	"red":    true,
 	"green":  true,
@@ -45,18 +47,19 @@ func PrintValidColors() []string {
 	return result
 }
 
-func PrintValidMetrics() []string {
+func PrintValidMetrics() string {
 	var result []string
 	for k := range ValidMetrics {
 		result = append(result, k)
 	}
-	return result
+	return "Choose one of ["+strings.Join(result, ", ")+"]"
 }
 
-func PrintValidSorts() []string {
+func PrintValidSorts() string {
 	var result []string
 	for k := range ValidSorts {
 		result = append(result, k)
 	}
-	return result
+	// return comma separated string
+	return "Choose one of ["+strings.Join(result, ", ")+"]"
 }
