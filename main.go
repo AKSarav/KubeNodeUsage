@@ -36,13 +36,13 @@ func usage() {
 	// print in fine columns with fixed width
 	displayfmt := "%-20s %-20s\n"
 	fmt.Printf(displayfmt, "  --help", "to display help")
-	fmt.Printf(displayfmt, "  --sortby", "sort by ", utils.PrintValidSorts)
+	fmt.Printf(displayfmt, "  --sortby", utils.PrintValidSorts())
 	fmt.Printf(displayfmt, "  --filternodes", "filter based on node name")
 	fmt.Printf(displayfmt, "  --filtercolor", "filter based on color category <30 Green, >30 <70 Orange, >70 Red")
 	fmt.Printf(displayfmt, "  --filterlabels", "filter based on labels")
 	fmt.Printf(displayfmt, "  --desc", "to enable reverse sort")
 	fmt.Printf(displayfmt, "  --debug", "enable debug mode")
-	fmt.Printf(displayfmt, "  --metrics", "choose which metrics", utils.PrintValidMetrics())
+	fmt.Printf(displayfmt, "  --metrics", utils.PrintValidMetrics())
 	os.Exit(1)
 }
 

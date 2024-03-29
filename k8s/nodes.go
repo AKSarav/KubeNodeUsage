@@ -104,7 +104,8 @@ func Nodes(metric string) (NodeStatsList []Node) {
 	// To fetch kubectl top nodes metrics
 	nodeMetrics, err := mc.MetricsV1beta1().NodeMetricses().List(context.TODO(), v1.ListOptions{})
 	if err != nil {
-		panic(err.Error())
+		fmt.Println("Unable to Get NodeMetrics. Is Metrics Server running ?")
+		os.Exit(2)
 	}
 
 	// To fetch kubectl get nodes information
