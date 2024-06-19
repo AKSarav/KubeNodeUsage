@@ -33,7 +33,6 @@ type Node struct {
 	Usage_cpu_percent    float32
 	TotalPods             string
 	LabelToDisplay 		 string
-	LabelAlias		 string
 }
 
 type Cluster struct{
@@ -244,9 +243,7 @@ func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 				nodestats.TotalPods = strconv.Itoa(totalpods)
 				
 				lblToDisplay := inputs.LabelToDisplay
-				if lblToDisplay != "" {
-					fmt.Println("Label to Display:", node.Labels[lblToDisplay])
-				}
+				nodestats.LabelToDisplay = node.Labels[lblToDisplay]
 
 				NodeStatsList = append(NodeStatsList, GetMetricsForNode(&nodestats, &node, &nm, metric)[0])
 				

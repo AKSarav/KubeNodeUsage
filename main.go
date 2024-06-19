@@ -18,6 +18,7 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/iancoleman/strcase"
 )
 
 var helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")).Render
@@ -237,12 +238,34 @@ func PrintDesign(output *strings.Builder, maxNameWidth int) {
 	fmt.Fprint(output, "\n")
 }
 
-func FilterForNodeName(m *model) {
-	if m.args.FilterNodes != "" {
-
-	} else {
-		return
+func getUnit(metricType string) string {
+	unit := ""
+	switch metricType{
+		case "memory": unit = "MB"
+		case "cpu": unit = "Cores"
+		case "disk": unit = "GB"
 	}
+	return unit
+}
+
+func headlinePrinter(m *model, output *strings.Builder, Nodes *[]k8s.Node, maxNameWidth *int) {
+
+	
+	unit := getUnit(m.args.Metrics)
+	freeHeading := "Free(" + unit+")"
+	maxHeading := "Max(" + unit+")"
+
+	values := []interface{}{"Name", freeHeading, maxHeading, "Pods"}
+	if m.args.LabelToDisplay != "" {
+		m.format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-10s %-10s %-5s %-12s %s\n"
+		values = append(values, m.args.LabelAlias, "Usage%")
+		*maxNameWidth = *maxNameWidth+12
+	} else {
+		m.format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-10s %-10s %-5s %s\n"
+		values = append(values, "Usage%")
+	}
+	fmt.Fprintf(output, m.format, values...)	
+	
 }
 
 func MetricsHandler(m model, output *strings.Builder) {
@@ -254,13 +277,13 @@ func MetricsHandler(m model, output *strings.Builder) {
 	SortByHandler(m)
 
 	// decide formatting and Maximum width
-	maxNameWidth := 35
+	maxNameWidth := 30
 	for _, node := range filteredNodes {
 		if maxNameWidth < len(node.Name) {
 			maxNameWidth = len(node.Name)
 		}
 	}
-	format := "%-" + strconv.Itoa(maxNameWidth) + "s %-12s %-12s %-5s %s\n"
+
 
 	// Header and Version info
 	
@@ -268,37 +291,44 @@ func MetricsHandler(m model, output *strings.Builder) {
 
 	fmt.Fprint(output, "\n# Context: ",m.clusterinfo.Context,"\n# Version: ",m.clusterinfo.Version,"\n# URL: ",m.clusterinfo.URL,"\n\n")
 
-	if m.args.Metrics == "memory" {
-		fmt.Fprint(output, "Memory Metrics\n\n")
-		fmt.Fprintf(output, format, "Name", "Free(MB)", "Max(MB)", "Pods", "Usage %")
-		PrintDesign(output, maxNameWidth)
+	fmt.Fprint(output, "# ", strcase.ToCamel(m.args.Metrics)," Metrics\n\n")
+	headlinePrinter(&m ,output, &filteredNodes, &maxNameWidth)
+	PrintDesign(output, maxNameWidth)
 
+	if m.args.Metrics == "memory" {
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_memory_percent) / 100.0)
-			fmt.Fprintf(output, format,
-				node.Name, strconv.Itoa(node.Free_memory/1024), strconv.Itoa(node.Capacity_memory/1024), node.TotalPods, prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
+			values := []interface{}{node.Name, strconv.Itoa(node.Free_memory/1024), strconv.Itoa(node.Capacity_memory/1024), node.TotalPods}
+			if m.args.LabelToDisplay != "" {
+				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
+			} else {
+				values = append(values, prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
+			}
+			fmt.Fprintf(output, m.format, values...)
 		}
 	} else if m.args.Metrics == "cpu" {
-		fmt.Fprint(output, "CPU Metrics\n\n")
-		fmt.Fprintf(output, format, "Name", "Free(Cores)", "Max(Cores)", "Pods", "Usage %")
-		PrintDesign(output, maxNameWidth)
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_cpu_percent) / 100.0)
-			fmt.Fprintf(output, format,
-				node.Name, strconv.Itoa(int(node.Free_cpu)), strconv.Itoa(node.Capacity_cpu), node.TotalPods, prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
+			values := []interface{}{node.Name, strconv.Itoa(int(node.Free_cpu)), strconv.Itoa(node.Capacity_cpu), node.TotalPods}
+			if m.args.LabelToDisplay != "" {
+				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
+			} else {
+				values = append(values, prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
+			}
+			fmt.Fprintf(output, m.format, values...)
 		}
 	} else if m.args.Metrics == "disk" {
-		fmt.Fprint(output, "Disk Metrics\n\n")
-		fmt.Fprintf(output, format, "Name", "Free(GB)", "Max(GB)", "Pods", "Usage %")
-		PrintDesign(output, maxNameWidth)
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_disk_percent) / 100.0)
-			fmt.Fprintf(output, format,
-				node.Name, strconv.Itoa(node.Free_disk/1024/1024), strconv.Itoa(node.Capacity_disk/1024/1024), node.TotalPods, prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
+			values := []interface{}{node.Name, strconv.Itoa(node.Free_disk/1024/1024), strconv.Itoa(node.Capacity_disk/1024/1024), node.TotalPods}
+			if m.args.LabelToDisplay != "" {
+				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
+			} else {
+				values = append(values, prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
+			}
+			fmt.Fprintf(output, m.format, values...)
 		}
 
-	} else if m.args.Metrics == "all" {
-		fmt.Println("All Metrics")
 	}
 }
 
@@ -364,6 +394,7 @@ func main() {
 		filterlabels string
 		metrics      string
 		label string
+		lblAlias string
 	)
 
 	flag.BoolVar(&helpFlag, "help", false, "to display help")
@@ -386,6 +417,18 @@ func main() {
 		utils.InitLogger()
 		utils.Logger.SetLevel(logrus.DebugLevel)
 	}
+
+
+	if (label != ""){
+		if strings.Contains(label, "#") {
+			lblAlias = strings.Split(label, "#")[1]
+			label = strings.Split(label, "#")[0]
+		} else {
+			lblAlias = "label"
+			label = strings.Split(label, "#")[0]
+		}
+	}
+
 	args := utils.Inputs{
 		HelpFlag:     helpFlag,
 		ReverseFlag:  reverseFlag,
@@ -396,6 +439,7 @@ func main() {
 		FilterLabels: filterlabels,
 		Metrics:      metrics,
 		LabelToDisplay: label,
+		LabelAlias: lblAlias,
 	}
 
 	checkinputs(&args) // sending the args using Address of Operator
@@ -424,6 +468,7 @@ type model struct {
 	clusterinfo k8s.Cluster
 	nodestats []k8s.Node
 	args      *utils.Inputs
+	format	string
 }
 
 // Init Bubble Tea model

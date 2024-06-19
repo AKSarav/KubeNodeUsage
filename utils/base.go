@@ -10,4 +10,5 @@ type Inputs struct {
 	FilterLabels string
 	Metrics      string
 	LabelToDisplay string
+	LabelAlias string
 }
