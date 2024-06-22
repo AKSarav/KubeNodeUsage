@@ -9,9 +9,11 @@ import (
 	"strconv"
 	"strings"
 
+	core "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
@@ -29,6 +31,8 @@ type Node struct {
 	Usage_disk_percent   float32
 	Usage_memory_percent float32
 	Usage_cpu_percent    float32
+	TotalPods             string
+	LabelToDisplay 		 string
 }
 
 type Cluster struct{
@@ -80,7 +84,93 @@ func ClusterInfo()(Cluster){
 	
 }
 
-func Nodes(metric string) (NodeStatsList []Node) {
+func GetMetricsForNode(nodestats *Node, node *core.Node, nm *v1beta1.NodeMetrics, metric string)([]Node) {
+
+	NodeMetrics := []Node{}
+
+	switch metric {
+	case "memory":
+		// Ki - Kibibyte - 1024 bytes
+		memcapcity, err := strconv.Atoi(strings.TrimSuffix(node.Status.Capacity.Memory().String(), "Ki"))
+		if err != nil {
+			fmt.Println("Error converting Memory capacity")
+		} else{
+			nodestats.Capacity_memory = memcapcity
+		}
+
+		// output is in Ki - Kibibyte - 1024 bytes
+		if memusage, err := strconv.Atoi(strings.TrimSuffix(nm.Usage.Memory().String(), "Ki")); err != nil {
+			// Try with Mi - Mebibyte - 1024 * 1024 bytes
+			if memusage, err := strconv.Atoi(strings.TrimSuffix(nm.Usage.Memory().String(), "Mi")); err != nil {
+				fmt.Println("Error converting Memory usage", err)
+			} else {
+				nodestats.Usage_memory = memusage
+				nodestats.Free_memory = nodestats.Capacity_memory - nodestats.Usage_memory
+			}
+		} else {
+			nodestats.Usage_memory = memusage
+			nodestats.Free_memory = nodestats.Capacity_memory - nodestats.Usage_memory
+		}
+
+		nodestats.Usage_memory_percent = float32(nodestats.Usage_memory) / float32(nodestats.Capacity_memory) * 100
+
+		NodeMetrics = append(NodeMetrics, *nodestats)
+
+	case "cpu":
+		Capacity_cpu, err := strconv.Atoi(node.Status.Capacity.Cpu().String())
+		// Converting to millicore 1 CPU 1000 millicore
+		nodestats.Capacity_cpu = Capacity_cpu * 1000
+		if err != nil {
+			fmt.Println("Error converting CPU capacity")
+		}
+		// fmt.Println("Capacity CPU:", nodestats.Capacity_cpu * 1000)
+
+		cpu_in_nanocore, err := strconv.ParseFloat(strings.TrimSuffix(nm.Usage.Cpu().String(), "n"), 32)
+		if err == nil {
+			cpu_in_millicore := cpu_in_nanocore / 1000000
+			nodestats.Usage_cpu = float32(cpu_in_millicore)
+			nodestats.Free_cpu = float32(nodestats.Capacity_cpu) - nodestats.Usage_cpu
+		} else {
+			// fmt.Println("Error converting CPU usage to millicore")
+		}
+
+		nodestats.Usage_cpu_percent = nodestats.Usage_cpu / float32(nodestats.Capacity_cpu) * 100
+		// fmt.Println("Usage CPU Percent:", nodestats.Usage_cpu_percent)
+
+		NodeMetrics = append(NodeMetrics, *nodestats)
+
+	case "disk":
+
+		// Ki - Kibibyte - 1024 bytes
+		diskcapacity, err := strconv.Atoi(strings.TrimSuffix(node.Status.Capacity.StorageEphemeral().String(), "Ki"))
+		if err != nil {
+			fmt.Println("Error converting Disk capacity")
+		} else{
+			nodestats.Capacity_disk = diskcapacity
+		}
+		// fmt.Println("Capacity Disk:", nodestats.Capacity_disk)
+
+		// Disk usage is taken from Node Status Allocatable - not from Node Metrics
+		// the result would be on bytes - need to convert to Ki
+		// fmt.Println(node.Status.Allocatable.StorageEphemeral().String())
+		if diskfree, err := strconv.Atoi(node.Status.Allocatable.StorageEphemeral().String()); err == nil {
+			nodestats.Free_disk = diskfree / 1024
+			nodestats.Usage_disk = nodestats.Capacity_disk - nodestats.Free_disk
+		} else {
+			fmt.Println("Error converting Disk usage")
+		}
+
+		nodestats.Usage_disk_percent = float32(nodestats.Usage_disk) / float32(nodestats.Capacity_disk) * 100
+
+		NodeMetrics = append(NodeMetrics, *nodestats)
+	}
+	return NodeMetrics
+}
+
+
+func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
+
+	metric := inputs.Metrics
 
 	utils.InitLogger()
 	kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
@@ -115,6 +205,15 @@ func Nodes(metric string) (NodeStatsList []Node) {
 		panic(err.Error())
 	}
 
+	// To fetch kubectl get pods information
+	pods, err := clientset.CoreV1().Pods("").List(context.TODO(), v1.ListOptions{})
+	if err != nil {
+		fmt.Println("Failed to Get Pods")
+		panic(err.Error())
+	}
+
+	
+
 	// output comes in this format
 	//{{270301052 -9} {<nil>} 270301052n DecimalSI}
 	//is reminiscent of how Kubernetes represents resource quantities,
@@ -134,77 +233,20 @@ func Nodes(metric string) (NodeStatsList []Node) {
 				// fmt.Println("Node Name:", node.Name)
 				nodestats.Name = node.Name
 
-				switch metric {
-				case "memory":
-					// Ki - Kibibyte - 1024 bytes
-					nodestats.Capacity_memory, err = strconv.Atoi(strings.TrimSuffix(node.Status.Capacity.Memory().String(), "Ki"))
-					if err != nil {
-						fmt.Println("Error converting Memory capacity")
+				// Counting Total Pods in the Node
+				var totalpods int
+				for _, pod := range pods.Items {
+					if pod.Spec.NodeName == node.Name {
+						totalpods++
 					}
-					// output is in Ki - Kibibyte - 1024 bytes
-					if memusage, err := strconv.Atoi(strings.TrimSuffix(nm.Usage.Memory().String(), "Ki")); err != nil {
-						// Try with Mi - Mebibyte - 1024 * 1024 bytes
-						if memusage, err := strconv.Atoi(strings.TrimSuffix(nm.Usage.Memory().String(), "Mi")); err != nil {
-							fmt.Println("Error converting Memory usage", err)
-						} else {
-							nodestats.Usage_memory = memusage
-							nodestats.Free_memory = nodestats.Capacity_memory - nodestats.Usage_memory
-						}
-					} else {
-						nodestats.Usage_memory = memusage
-						nodestats.Free_memory = nodestats.Capacity_memory - nodestats.Usage_memory
-					}
-
-					nodestats.Usage_memory_percent = float32(nodestats.Usage_memory) / float32(nodestats.Capacity_memory) * 100
-
-					NodeStatsList = append(NodeStatsList, nodestats)
-
-				case "cpu":
-					Capacity_cpu, err := strconv.Atoi(node.Status.Capacity.Cpu().String())
-					// Converting to millicore 1 CPU 1000 millicore
-					nodestats.Capacity_cpu = Capacity_cpu * 1000
-					if err != nil {
-						fmt.Println("Error converting CPU capacity")
-					}
-					// fmt.Println("Capacity CPU:", nodestats.Capacity_cpu * 1000)
-
-					cpu_in_nanocore, err := strconv.ParseFloat(strings.TrimSuffix(nm.Usage.Cpu().String(), "n"), 32)
-					if err == nil {
-						cpu_in_millicore := cpu_in_nanocore / 1000000
-						nodestats.Usage_cpu = float32(cpu_in_millicore)
-						nodestats.Free_cpu = float32(nodestats.Capacity_cpu) - nodestats.Usage_cpu
-					} else {
-						// fmt.Println("Error converting CPU usage to millicore")
-					}
-
-					nodestats.Usage_cpu_percent = nodestats.Usage_cpu / float32(nodestats.Capacity_cpu) * 100
-					// fmt.Println("Usage CPU Percent:", nodestats.Usage_cpu_percent)
-
-					NodeStatsList = append(NodeStatsList, nodestats)
-
-				case "disk":
-
-					// Ki - Kibibyte - 1024 bytes
-					nodestats.Capacity_disk, err = strconv.Atoi(strings.TrimSuffix(node.Status.Capacity.StorageEphemeral().String(), "Ki"))
-					if err != nil {
-						fmt.Println("Error converting Disk capacity")
-					}
-					// fmt.Println("Capacity Disk:", nodestats.Capacity_disk)
-
-					// Disk usage is taken from Node Status Allocatable - not from Node Metrics
-					// the result would be on bytes - need to convert to Ki
-					// fmt.Println(node.Status.Allocatable.StorageEphemeral().String())
-					if diskfree, err := strconv.Atoi(node.Status.Allocatable.StorageEphemeral().String()); err == nil {
-						nodestats.Free_disk = diskfree / 1024
-						nodestats.Usage_disk = nodestats.Capacity_disk - nodestats.Free_disk
-					} else {
-						fmt.Println("Error converting Disk usage")
-					}
-
-					nodestats.Usage_disk_percent = float32(nodestats.Usage_disk) / float32(nodestats.Capacity_disk) * 100
-
-					NodeStatsList = append(NodeStatsList, nodestats)
 				}
+				nodestats.TotalPods = strconv.Itoa(totalpods)
+				
+				lblToDisplay := inputs.LabelToDisplay
+				nodestats.LabelToDisplay = node.Labels[lblToDisplay]
+
+				NodeStatsList = append(NodeStatsList, GetMetricsForNode(&nodestats, &node, &nm, metric)[0])
+				
 			}
 
 		}

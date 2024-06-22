@@ -18,6 +18,7 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/iancoleman/strcase"
 )
 
 var helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")).Render
@@ -47,12 +48,12 @@ func usage() {
 }
 
 // PrintArgs is used for Printing an arguments/*
-func PrintArgs(args Inputs) {
+func PrintArgs(args utils.Inputs) {
 	// print key value pairs
 	t := reflect.TypeOf(args)
 	v := reflect.ValueOf(args)
 
-	if args.debug {
+	if args.Debug {
 		for i := 0; i < t.NumField(); i++ {
 			field := t.Field(i)
 			value := v.Field(i)
@@ -63,7 +64,7 @@ func PrintArgs(args Inputs) {
 }
 
 func DebugView(m model, output *strings.Builder) {
-	if m.args.debug {
+	if m.args.Debug {
 		fmt.Fprint(output, " \nDebug mode enabled")
 		fmt.Fprint(output, "\nArgs: ", m.args)
 		fmt.Fprint(output, "\nNodes: ", m.nodestats)
@@ -72,29 +73,29 @@ func DebugView(m model, output *strings.Builder) {
 
 func RightMetric(m model, index int) float32 {
 
-	switch m.args.metrics {
+	switch m.args.Metrics {
 	case "memory":
-		if m.args.sortby == "free" {
+		if m.args.SortBy == "free" {
 			return float32(m.nodestats[index].Free_memory)
-		} else if m.args.sortby == "capacity" || m.args.sortby == "max" {
+		} else if m.args.SortBy == "capacity" || m.args.SortBy == "max" {
 			return float32(m.nodestats[index].Capacity_memory)
-		} else if m.args.sortby == "color" || m.args.sortby == "usage" {
+		} else if m.args.SortBy == "color" || m.args.SortBy == "usage" {
 			return m.nodestats[index].Usage_memory_percent
 		}
 	case "cpu":
-		if m.args.sortby == "free" {
+		if m.args.SortBy == "free" {
 			return float32(m.nodestats[index].Free_cpu)
-		} else if m.args.sortby == "capacity" || m.args.sortby == "max" {
+		} else if m.args.SortBy == "capacity" || m.args.SortBy == "max" {
 			return float32(m.nodestats[index].Capacity_cpu)
-		} else if m.args.sortby == "color" || m.args.sortby == "usage" {
+		} else if m.args.SortBy == "color" || m.args.SortBy == "usage" {
 			return m.nodestats[index].Usage_cpu_percent
 		}
 	case "disk":
-		if m.args.sortby == "free" {
+		if m.args.SortBy == "free" {
 			return float32(m.nodestats[index].Free_disk)
-		} else if m.args.sortby == "capacity" || m.args.sortby == "max" {
+		} else if m.args.SortBy == "capacity" || m.args.SortBy == "max" {
 			return float32(m.nodestats[index].Capacity_disk)
-		} else if m.args.sortby == "color" || m.args.sortby == "usage" {
+		} else if m.args.SortBy == "color" || m.args.SortBy == "usage" {
 			return m.nodestats[index].Usage_disk_percent
 		}
 	}
@@ -104,8 +105,8 @@ func RightMetric(m model, index int) float32 {
 
 func SortByHandler(m model) {
 
-	if m.args.sortby != "" && m.args.sortby != "name" && m.args.sortby != "node" {
-		if !m.args.reverseFlag {
+	if m.args.SortBy != "" && m.args.SortBy != "name" && m.args.SortBy != "node" {
+		if !m.args.ReverseFlag {
 			sort.Slice(m.nodestats, func(i, j int) bool {
 				return RightMetric(m, i) < RightMetric(m, j)
 			})
@@ -114,8 +115,8 @@ func SortByHandler(m model) {
 				return RightMetric(m, i) > RightMetric(m, j)
 			})
 		}
-	} else if m.args.sortby != "name" || m.args.sortby != "node" {
-		if !m.args.reverseFlag {
+	} else if m.args.SortBy != "name" || m.args.SortBy != "node" {
+		if !m.args.ReverseFlag {
 			sort.Slice(m.nodestats, func(i, j int) bool {
 				return m.nodestats[i].Name < m.nodestats[j].Name
 			})
@@ -128,11 +129,11 @@ func SortByHandler(m model) {
 
 }
 func ApplyFilters(m model) []k8s.Node {
-	if m.args.filterlabels != "" {
+	if m.args.FilterLabels != "" {
 		return FilterForLabel(m)
-	} else if m.args.filternodes != "" {
+	} else if m.args.FilterNodes != "" {
 		return FilterForNode(m)
-	} else if m.args.filtercolor != "" {
+	} else if m.args.FilterColor != "" {
 		return FilterForColor(m)
 	} else {
 		return FilterForColor(m)
@@ -141,7 +142,7 @@ func ApplyFilters(m model) []k8s.Node {
 
 func FilterForNode(m model) []k8s.Node {
 	var filteredNodes []k8s.Node
-	FilterNodeInput := strings.Split(m.args.filternodes, ",")
+	FilterNodeInput := strings.Split(m.args.FilterNodes, ",")
 
 	// Creating a new map to store the values of NodeStats list
 	// Choosing Map over Nested Array for comparision is best for TimeComplexity
@@ -178,7 +179,7 @@ func FilterForNode(m model) []k8s.Node {
 
 func FilterForLabel(m model) []k8s.Node {
 	var filteredNodes []k8s.Node
-	FilterLabelInput := strings.Split(m.args.filternodes, ",")
+	FilterLabelInput := strings.Split(m.args.FilterNodes, ",")
 	utils.Logger.Debug("Filter For Node results", FilterLabelInput)
 	return filteredNodes
 }
@@ -189,7 +190,7 @@ func FilterForColor(m model) []k8s.Node {
 	var thresholdMin, thresholdMax float64
 
 	// Define the color threshold values
-	switch m.args.filtercolor {
+	switch m.args.FilterColor {
 	case "red":
 		thresholdMin = 70
 		thresholdMax = 100
@@ -206,9 +207,8 @@ func FilterForColor(m model) []k8s.Node {
 
 	// Filter nodes based on metric and threshold values
 	for _, node := range m.nodestats {
-		// fmt.Printf("Checking node %s and selected metric %s",string(node.Name), string(m.args.metrics))
 		var usagepercent float64
-		switch m.args.metrics {
+		switch m.args.Metrics {
 		case "memory":
 			usagepercent = float64(node.Usage_memory_percent) / 100.0
 		case "cpu":
@@ -216,8 +216,8 @@ func FilterForColor(m model) []k8s.Node {
 		case "disk":
 			usagepercent = float64(node.Usage_disk_percent) / 100.0
 		default:
-			if m.args.debug {
-				fmt.Println("No Matching Metric", m.args.metrics)
+			if m.args.Debug {
+				fmt.Println("No Matching Metric", m.args.Metrics)
 			}
 		}
 
@@ -225,7 +225,7 @@ func FilterForColor(m model) []k8s.Node {
 			filteredNodes = append(filteredNodes, node)
 		}
 	}
-	if m.args.debug {
+	if m.args.Debug {
 		fmt.Println("Filter For Color result:", filteredNodes)
 	}
 	return filteredNodes
@@ -238,12 +238,34 @@ func PrintDesign(output *strings.Builder, maxNameWidth int) {
 	fmt.Fprint(output, "\n")
 }
 
-func FilterForNodeName(m *model) {
-	if m.args.filternodes != "" {
-
-	} else {
-		return
+func getUnit(metricType string) string {
+	unit := ""
+	switch metricType{
+		case "memory": unit = "MB"
+		case "cpu": unit = "Cores"
+		case "disk": unit = "GB"
 	}
+	return unit
+}
+
+func headlinePrinter(m *model, output *strings.Builder, Nodes *[]k8s.Node, maxNameWidth *int) {
+
+	
+	unit := getUnit(m.args.Metrics)
+	freeHeading := "Free(" + unit+")"
+	maxHeading := "Max(" + unit+")"
+
+	values := []interface{}{"Name", freeHeading, maxHeading, "Pods"}
+	if m.args.LabelToDisplay != "" {
+		m.format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-10s %-10s %-5s %-12s %s\n"
+		values = append(values, m.args.LabelAlias, "Usage%")
+		*maxNameWidth = *maxNameWidth+12
+	} else {
+		m.format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-10s %-10s %-5s %s\n"
+		values = append(values, "Usage%")
+	}
+	fmt.Fprintf(output, m.format, values...)	
+	
 }
 
 func MetricsHandler(m model, output *strings.Builder) {
@@ -255,13 +277,13 @@ func MetricsHandler(m model, output *strings.Builder) {
 	SortByHandler(m)
 
 	// decide formatting and Maximum width
-	maxNameWidth := 35
+	maxNameWidth := 30
 	for _, node := range filteredNodes {
 		if maxNameWidth < len(node.Name) {
 			maxNameWidth = len(node.Name)
 		}
 	}
-	format := "%-" + strconv.Itoa(maxNameWidth) + "s %-12s %-12s %s\n"
+
 
 	// Header and Version info
 	
@@ -269,81 +291,79 @@ func MetricsHandler(m model, output *strings.Builder) {
 
 	fmt.Fprint(output, "\n# Context: ",m.clusterinfo.Context,"\n# Version: ",m.clusterinfo.Version,"\n# URL: ",m.clusterinfo.URL,"\n\n")
 
-	if m.args.metrics == "memory" {
-		fmt.Fprint(output, "Memory Metrics\n\n")
-		fmt.Fprintf(output, format, "Name", "Free(MB)", "Max(MB)", "Usage %")
-		PrintDesign(output, maxNameWidth)
+	fmt.Fprint(output, "# ", strcase.ToCamel(m.args.Metrics)," Metrics\n\n")
+	headlinePrinter(&m ,output, &filteredNodes, &maxNameWidth)
+	PrintDesign(output, maxNameWidth)
 
+	if m.args.Metrics == "memory" {
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_memory_percent) / 100.0)
-			fmt.Fprintf(output, format,
-				node.Name, strconv.Itoa(node.Free_memory/1024), strconv.Itoa(node.Capacity_memory/1024), prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
+			values := []interface{}{node.Name, strconv.Itoa(node.Free_memory/1024), strconv.Itoa(node.Capacity_memory/1024), node.TotalPods}
+			if m.args.LabelToDisplay != "" {
+				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
+			} else {
+				values = append(values, prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
+			}
+			fmt.Fprintf(output, m.format, values...)
 		}
-	} else if m.args.metrics == "cpu" {
-		fmt.Fprint(output, "CPU Metrics\n\n")
-		fmt.Fprintf(output, format, "Name", "Free(Cores)", "Max(Cores)", "Usage %")
-		PrintDesign(output, maxNameWidth)
+	} else if m.args.Metrics == "cpu" {
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_cpu_percent) / 100.0)
-			fmt.Fprintf(output, format,
-				node.Name, strconv.Itoa(int(node.Free_cpu)), strconv.Itoa(node.Capacity_cpu), prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
+			values := []interface{}{node.Name, strconv.Itoa(int(node.Free_cpu)), strconv.Itoa(node.Capacity_cpu), node.TotalPods}
+			if m.args.LabelToDisplay != "" {
+				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
+			} else {
+				values = append(values, prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
+			}
+			fmt.Fprintf(output, m.format, values...)
 		}
-	} else if m.args.metrics == "disk" {
-		fmt.Fprint(output, "Disk Metrics\n\n")
-		fmt.Fprintf(output, format, "Name", "Free(GB)", "Max(GB)", "Usage %")
-		PrintDesign(output, maxNameWidth)
+	} else if m.args.Metrics == "disk" {
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_disk_percent) / 100.0)
-			fmt.Fprintf(output, format,
-				node.Name, strconv.Itoa(node.Free_disk/1024/1024), strconv.Itoa(node.Capacity_disk/1024/1024), prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
+			values := []interface{}{node.Name, strconv.Itoa(node.Free_disk/1024/1024), strconv.Itoa(node.Capacity_disk/1024/1024), node.TotalPods}
+			if m.args.LabelToDisplay != "" {
+				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
+			} else {
+				values = append(values, prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
+			}
+			fmt.Fprintf(output, m.format, values...)
 		}
 
-	} else if m.args.metrics == "all" {
-		fmt.Println("All Metrics")
 	}
 }
 
-func checkinputs(args *Inputs) {
+func checkinputs(args *utils.Inputs) {
 
 	IsAllFiltersOn(args)
 
-	if args.filtercolor != "" {
-		if !utils.IsValidColor(args.filtercolor) {
+	if args.FilterColor != "" {
+		if !utils.IsValidColor(args.FilterColor) {
 			fmt.Println("Not a valid color please choose one of the following colors", utils.PrintValidColors())
 			os.Exit(2)
 		}
 	}
 
-	if args.metrics != "" {
-		if !utils.IsValidMetric(args.metrics) {
+	if args.Metrics != "" {
+		if !utils.IsValidMetric(args.Metrics) {
 			fmt.Println("Not a valid Metric please choose one of", utils.PrintValidMetrics())
 			os.Exit(2)
 		}
 	}
 
-	if args.sortby != "" {
-		if !utils.IsValidSort(args.sortby) {
+	if args.SortBy != "" {
+		if !utils.IsValidSort(args.SortBy) {
 			fmt.Println("Not a valid Sort by option please choose one of", utils.PrintValidSorts())
 			os.Exit(2)
 		}
 	}
 }
 
-type Inputs struct {
-	helpFlag     bool
-	reverseFlag  bool
-	debug        bool
-	sortby       string
-	filternodes  string
-	filtercolor  string
-	filterlabels string
-	metrics      string
-}
 
-func IsAllFiltersOn(args *Inputs) {
+
+func IsAllFiltersOn(args *utils.Inputs) {
 
 	var tempList []string
-	tempList = append(tempList, args.filterlabels, args.filternodes, args.filtercolor)
+	tempList = append(tempList, args.FilterLabels, args.FilterNodes, args.FilterColor)
 	filtersIntegrityValue := 0
 	for _, filter := range tempList {
 		if filter != "" {
@@ -373,6 +393,8 @@ func main() {
 		filtercolor  string
 		filterlabels string
 		metrics      string
+		label string
+		lblAlias string
 	)
 
 	flag.BoolVar(&helpFlag, "help", false, "to display help")
@@ -383,6 +405,8 @@ func main() {
 	flag.StringVar(&filtercolor, "filtercolor", "", "filter nodes based on color")
 	flag.StringVar(&filterlabels, "filterlabels", "", "filter nodes based on labels")
 	flag.StringVar(&metrics, "metrics", "memory", "choose which metrics to display (memory, cpu, disk)")
+	flag.StringVar(&label, "label", "", "choose which label to display")
+
 	flag.Parse()
 
 	if helpFlag {
@@ -393,15 +417,29 @@ func main() {
 		utils.InitLogger()
 		utils.Logger.SetLevel(logrus.DebugLevel)
 	}
-	args := Inputs{
-		helpFlag:     helpFlag,
-		reverseFlag:  reverseFlag,
-		debug:        debug,
-		sortby:       sortby,
-		filternodes:  filternodes,
-		filtercolor:  filtercolor,
-		filterlabels: filterlabels,
-		metrics:      metrics,
+
+
+	if (label != ""){
+		if strings.Contains(label, "#") {
+			lblAlias = strings.Split(label, "#")[1]
+			label = strings.Split(label, "#")[0]
+		} else {
+			lblAlias = "label"
+			label = strings.Split(label, "#")[0]
+		}
+	}
+
+	args := utils.Inputs{
+		HelpFlag:     helpFlag,
+		ReverseFlag:  reverseFlag,
+		Debug:        debug,
+		SortBy:       sortby,
+		FilterNodes:  filternodes,
+		FilterColor:  filtercolor,
+		FilterLabels: filterlabels,
+		Metrics:      metrics,
+		LabelToDisplay: label,
+		LabelAlias: lblAlias,
 	}
 
 	checkinputs(&args) // sending the args using Address of Operator
@@ -414,7 +452,7 @@ func main() {
 	mdl := model{}
 	mdl.args = &args
 	mdl.clusterinfo = k8s.ClusterInfo()
-	mdl.nodestats = k8s.Nodes(metrics)
+	mdl.nodestats = k8s.Nodes(&args)
 	
 	if _, err := tea.NewProgram(mdl).Run(); err != nil {
 		fmt.Println("Oh no!", err)
@@ -429,7 +467,8 @@ type tickMsg time.Time
 type model struct {
 	clusterinfo k8s.Cluster
 	nodestats []k8s.Node
-	args      *Inputs
+	args      *utils.Inputs
+	format	string
 }
 
 // Init Bubble Tea model
@@ -454,14 +493,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// // check if R or R is pressed
 		// if msg.Type == tea.KeyRunes && (msg.Runes[0] == 'R' || msg.Runes[0] == 'r') {
 		// 	fmt.Println("R or r pressed")
-		// 	m.nodestats = k8s.Nodes(m.args.metrics)
+		// 	m.nodestats = k8s.Nodes(m.args.Metrics)
 		// 	return m, tea.ClearScreen
 		// }
 	case tickMsg:
 		m.clusterinfo = k8s.ClusterInfo()
-		m.nodestats = k8s.Nodes(m.args.metrics)
+		m.nodestats = k8s.Nodes(m.args)
 		return m, tea.Batch(tickCmd())
-
 	}
 	return m, nil
 
