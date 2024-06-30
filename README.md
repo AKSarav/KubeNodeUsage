@@ -36,6 +36,7 @@ It has lot of capabilities to filter the output based on
 
 :sparkle: Screenshot of Version 3.0.2 with Label Column and Total Pods Count
 
+![Alt text](KubeNodeUsage-V3.0.2.PNG)
 
 &nbsp;
 
@@ -55,7 +56,7 @@ I have tested it with the following K8s clusters
 
 **Versions**
 
-I have tested KubeNodeUsage starting from **1.19 - 1.28** ( the latest stable version as of Dec2023)
+I have tested KubeNodeUsage starting from **1.19 - 1.29** ( the latest stable version as of 30th June)
 
 &nbsp; 
 
