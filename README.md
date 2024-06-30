@@ -14,14 +14,15 @@ KubeNodeUsage use your local KubeConfig file to connect to the cluster and use K
 
 It fetches the Node Metrics from Kubernetes API and apply filters and aggreations to display it in a nice human readable Graphical format as Bar Charts.
 
-KubeNodeUsage helps you to monitor the **CPU**, **Memory** and **Disk** usage of the Nodes in your Kubernetes Cluster
-
-The output can be sorted, filtered, and customized based on your requirements
 
 
 ## Features in NutShell 
 
-KubeNodeUsage has different filters to filter the output based on 
+KubeNodeUsage helps you to monitor the **CPU**, **Memory** and **Disk** usage of the Nodes in your Kubernetes Cluster
+
+The output can be **sorted**, **filtered**, and **customized** based on your requirements
+
+KubeNodeUsage has different filters to format the output based on the following properties
 
 * NodeName
 * Usage 
@@ -45,6 +46,12 @@ All the filtering is controlled by three main flags
 You can sort the output using following flags
 - `sortby` - This is used to sort the output based on the specific metric ( name, free, usage, color, capacity, max)
 - `desc` - This is used to sort the output in descending order
+
+By Default KubeNodeUsage prints the Cluster info you can disable it with `--noinfo` flag
+
+If you want to display a specific label as an output - you can use `--label` option with your desired output alias.
+
+We have example commands and screenshots to help you. Feel free to reach out for any help.
 
 &nbsp;
 
