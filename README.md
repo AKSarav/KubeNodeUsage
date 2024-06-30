@@ -14,21 +14,49 @@ KubeNodeUsage use your local KubeConfig file to connect to the cluster and use K
 
 It fetches the Node Metrics from Kubernetes API and apply filters and aggreations to display it in a nice human readable Graphical format as Bar Charts.
 
-It has lot of capabilities to filter the output based on
+KubeNodeUsage helps you to monitor the **CPU**, **Memory** and **Disk** usage of the Nodes in your Kubernetes Cluster
+
+The output can be sorted, filtered, and customized based on your requirements
+
+KubeNodeUsage has different filters to filter the output based on 
+
+&nbsp;
 
 * NodeName
-* Usage
+* Usage 
 * Free/Availability of Disk,CPU, Memory
 * Max/Capacity of Disk,CPU,Memory
 * Color - We use Green, Red and Orange to represent the usage 
   * Green - Below 30% Usage 
   * Orange - Between 30% to 70% Usage
   * Red - Above 70% Usage
+* Label - Key Value pair to filter the nodes based on the Label presence on the Node ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2)
+
+&nbsp;
+
+All the filtering is controlled by three main flags
+- `filternodes` - This is used to filter the nodes based on the Node Name using Regular Expression
+- `filtercolor` - This is used to filter the nodes based on the Color Category ( Green, Orange, Red)
+- `filterlabel` - This is used to filter the nodes based on the Label Key Value pair ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2)
+
+&nbsp;
+
+You can sort the output using following flags
+- `sortby` - This is used to sort the output based on the specific metric ( name, free, usage, color, capacity, max)
+- `desc` - This is used to sort the output in descending order
+
+&nbsp;
+
+**Additional Key Features include**
 * Ability to display the Label information as a new column in the output ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2)
 * Displaying the Total Pods count in the Cluster ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2)
 * To Turn off the Cluster Info display ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2)
+* Label - You can display the Label information as a new column in the output ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2) 
 
 
+> Refer the Options and Screenshots section for more details
+
+&nbsp;
 ## Screenshots :camera:
 
 :sparkle: Screenshot of Latest Version 3.0.1 with Cluster Info 
@@ -44,6 +72,10 @@ It has lot of capabilities to filter the output based on
 ![Alt text](assets/filternodes-regex.png)
 
 &nbsp;
+
+:sparkle: Screenshot of Label Filtering with FilterLabel
+
+![Alt text](assets/KubeNodeUsage-FilterLabel.png)
 
 ## Kubernetes Supported Versions / Clusters :white_check_mark:
 
@@ -126,6 +158,8 @@ You can find the detail information on all available options here
 
 - `help`: Display help information.
 
+- `noinfo` : Disable the Cluster Info display. ( New feature in V3.0.2)
+
 - `metrics`: Choose which metric to display. Valid options include:
 
     - memory
@@ -140,7 +174,9 @@ You can find the detail information on all available options here
     - `green`
     - `orange`
 
-- `desc`: Enable reverse sort order.
+- `filterlabel`: Filter nodes based on the label key-value pair. ( New feature in V3.0.2) Syntax is `--filterlabel=<label-key>=<label-value>`
+
+
 
 - `debug`: Enable debug mode. ( Prints more logging for debug)
 
@@ -157,6 +193,9 @@ You can find the detail information on all available options here
 
     - `capacity` (Sort by resource capacity)
     - `max` (Sort by maximum resource value, same as 'capacity')
+-  `desc`: Enable reverse sort order.
+-  `label`: Display the Label information as a new column in the output. ( New feature in V3.0.2) Syntax is `--label=<label-key>#<columnname>`
+  
 
 &nbsp;
 ## Examples:
@@ -216,12 +255,18 @@ KubeNodeUsage --sortby name --filternodes "app.*" --debug
 KubeNodeUsage --label eks.amazonaws.com/capacityType#capacity 
 KubeNodeUsage --label beta.kubernetes.io/instance-type#InstanceType 
 
+# Filter Nodes based on Label Key Value pair ( New feature in V3.0.2)
+KubeNodeUsage --filterlabel eks.amazonaws.com/capacityType=OnDemand
+KubeNodeUsage --filterlabel beta.kubernetes.io/instance-type=t3.medium
+KubeNodeUsage --filterlabel topology.kubernetes.io/zone=us-east-1a
+
+
 ```
 &nbsp;
 ## Todo
 
-* `FilterLabel` Filter by Label feature to be added
 * Pod Usage stats to be added as a feature
+* Requested vs Limits metrics to be added
 
 &nbsp;
 
