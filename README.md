@@ -1,10 +1,14 @@
 
 # KubeNodeUsage
 
+![GitHub release](https://img.shields.io/github/v/release/AKSarav/Kube-Node-Usage?style=for-the-badge)![GitHub all releases](https://img.shields.io/github/downloads/AKSarav/Kube-Node-Usage/total?style=for-the-badge)![GitHub stars](https://img.shields.io/github/stars/AKSarav/Kube-Node-Usage?style=for-the-badge)
+
+![Go-Version](https://img.shields.io/github/go-mod/go-version/AKSarav/Kube-Node-Usage)![GitHub](https://img.shields.io/github/license/AKSarav/Kube-Node-Usage)![GitHub issues](https://img.shields.io/github/issues/AKSarav/Kube-Node-Usage)![GitHub pull requests](https://img.shields.io/github/issues-pr/AKSarav/Kube-Node-Usage)
+
+
+**KubeNodeUsage** is a Terminal App designed to provide insights into Kubernetes node usage. It offers various options for customization to help you analyze and filter node metrics effectively.
+
 ![Alt text](KubeNodeUsage-demo.gif)
-
-
-**KubeNodeUsage** is a tool designed to provide insights into Kubernetes node usage. It offers various options for customization to help you analyze and filter node metrics effectively.
 
 KubeNodeUsage use your local KubeConfig file to connect to the cluster and use Kubernetes API directly using Kubernetes GO SDK
 
@@ -20,12 +24,17 @@ It has lot of capabilities to filter the output based on
   * Green - Below 30% Usage 
   * Orange - Between 30% to 70% Usage
   * Red - Above 70% Usage
+* Ability to display the Label information as a new column in the output ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2)
+* Displaying the Total Pods count in the Cluster ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2)
+* To Turn off the Cluster Info display ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2)
 
 
 
 :sparkle: Screenshot of Latest Version 3.0.1 with Cluster Info 
 
 ![Alt text](KubeNodeUsageV3.0.1.PNG)
+
+:sparkle: Screenshot of Version 3.0.2 with Label Column and Total Pods Count
 
 
 &nbsp;
@@ -153,6 +162,11 @@ KubeNodeUsage --help
 # Display node usage with default settings (memory is the default metric)
 KubeNodeUsage
 
+# To disable the Cluster Info display use --noinfo flag with any other options
+KubeNodeUsage --noinfo
+KubeNodeUsage --noinfo --metrics=cpu
+KubeNodeUsage --noinfo --metrics=cpu --sortby=usage --desc
+
 # Display node usage sorted by node name
 KubeNodeUsage --sortby=name
 
@@ -191,6 +205,10 @@ KubeNodeUsage --metrics=cpu --filtercolor=orange --filternodes=".*172-31.*"
 
 # Display node usage sorted by name, filter nodes with a name starting with "app", and enable debug mode
 KubeNodeUsage --sortby=name --filternodes="app.*" --debug
+
+# Display Label as a new column in the output. use the `--label` the syntax is "--label=<label-name>:<alias/columnname>" ( New feature in V3.0.2)
+KubeNodeUsage --label=eks.amazonaws.com/capacityType#capacity 
+KubeNodeUsage --label=beta.kubernetes.io/instance-type#InstanceType 
 
 ```
 &nbsp;
