@@ -7,7 +7,7 @@ type Inputs struct {
 	SortBy       string
 	FilterNodes  string
 	FilterColor  string
-	FilterLabels string
+	FilterLabel string
 	Metrics      string
 	LabelToDisplay string
 	LabelAlias string

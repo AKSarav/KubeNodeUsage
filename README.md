@@ -8,7 +8,7 @@
 
 **KubeNodeUsage** is a Terminal App designed to provide insights into Kubernetes node usage. It offers various options for customization to help you analyze and filter node metrics effectively.
 
-![Alt text](KubeNodeUsage-demo.gif)
+![Alt text](assets/KubeNodeUsage-demo.gif)
 
 KubeNodeUsage use your local KubeConfig file to connect to the cluster and use Kubernetes API directly using Kubernetes GO SDK
 
@@ -29,14 +29,19 @@ It has lot of capabilities to filter the output based on
 * To Turn off the Cluster Info display ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2)
 
 
+## Screenshots :camera:
 
 :sparkle: Screenshot of Latest Version 3.0.1 with Cluster Info 
 
-![Alt text](KubeNodeUsageV3.0.1.PNG)
+![Alt text](assets/KubeNodeUsageV3.0.1.png)
 
-:sparkle: Screenshot of Version 3.0.2 with Label Column and Total Pods Count
+:sparkle: Screenshot of Version 3.0.2 with Label Column and Total Pods Count with `-noinfo` flag ( to turn off Cluster Info) 
 
-![Alt text](KubeNodeUsage-V3.0.2.PNG)
+![Alt text](assets/KubeNodeUsage-V3.0.2.PNG)
+
+:sparkle: Screenshot of Multiple RegEx patterns with FilterNodes
+
+![Alt text](assets/filternodes-regex.png)
 
 &nbsp;
 
@@ -165,57 +170,57 @@ KubeNodeUsage
 
 # To disable the Cluster Info display use --noinfo flag with any other options
 KubeNodeUsage --noinfo
-KubeNodeUsage --noinfo --metrics=cpu
-KubeNodeUsage --noinfo --metrics=cpu --sortby=usage --desc
+KubeNodeUsage --noinfo --metrics cpu
+KubeNodeUsage --noinfo --metrics cpu --sortby usage --desc
 
 # Display node usage sorted by node name
-KubeNodeUsage --sortby=name
+KubeNodeUsage --sortby name
 
 # Display node usage sorted by free resources in descending order
-KubeNodeUsage --sortby=free --desc
+KubeNodeUsage --sortby free --desc
 
 # Display node usage sorted by usage in ascending order
-KubeNodeUsage --sortby=usage
+KubeNodeUsage --sortby usage
 
 # Display node usage sorted by capacity in descending order
-KubeNodeUsage --sortby=capacity --desc
+KubeNodeUsage --sortby capacity --desc
 
-# Filter nodes with a name starting with "web"
-KubeNodeUsage --filternodes="web.*"
+# Filter nodes with a name starting with "web" - supports regular expression
+KubeNodeUsage --filternodes "web.*"
 
 # Filter nodes with color category "green"
-KubeNodeUsage --filtercolor=green
+KubeNodeUsage --filtercolor green
 
 # Display memory usage for all nodes
-KubeNodeUsage --metrics=memory
+KubeNodeUsage --metrics memory
 
 # Display disk usage for nodes with a name containing "data"
-KubeNodeUsage --metrics=disk --filternodes=".*data.*"
+KubeNodeUsage --metrics disk --filternodes ".*data.*"
 
 # Show CPU usage for nodes with color category "red" in descending order
-KubeNodeUsage --metrics=cpu --filtercolor=red --desc
+KubeNodeUsage --metrics cpu --filtercolor red --desc
 
 # Display node usage sorted by maximum resource value in ascending order
-KubeNodeUsage --sortby=max
+KubeNodeUsage --sortby max
 
 # Display node usage sorted by capacity, show memory usage, and filter nodes with a name starting with "prod"
-KubeNodeUsage --sortby=capacity --metrics=memory --filternodes="prod.*"
+KubeNodeUsage --sortby capacity --metrics memory --filternodes "prod.*"
 
-# Show CPU usage for nodes with color category "orange" and filter nodes with a name containing "IP range"
-KubeNodeUsage --metrics=cpu --filtercolor=orange --filternodes=".*172-31.*"
+# Show CPU usage for nodes with a name containing "IP range" - here we are using multiple regex patterns as comma separated values
+KubeNodeUsage --metrics cpu --filternodes ".*172-31.*",".*172-32.*"
 
 # Display node usage sorted by name, filter nodes with a name starting with "app", and enable debug mode
-KubeNodeUsage --sortby=name --filternodes="app.*" --debug
+KubeNodeUsage --sortby name --filternodes "app.*" --debug
 
 # Display Label as a new column in the output. use the `--label` the syntax is "--label=<label-name>:<alias/columnname>" ( New feature in V3.0.2)
-KubeNodeUsage --label=eks.amazonaws.com/capacityType#capacity 
-KubeNodeUsage --label=beta.kubernetes.io/instance-type#InstanceType 
+KubeNodeUsage --label eks.amazonaws.com/capacityType#capacity 
+KubeNodeUsage --label beta.kubernetes.io/instance-type#InstanceType 
 
 ```
 &nbsp;
 ## Todo
 
-* `FilterLabels` Filter by Label feature to be added
+* `FilterLabel` Filter by Label feature to be added
 * Pod Usage stats to be added as a feature
 
 &nbsp;

@@ -40,10 +40,12 @@ func usage() {
 	fmt.Printf(displayfmt, "  --sortby", utils.PrintValidSorts())
 	fmt.Printf(displayfmt, "  --filternodes", "filter based on node name")
 	fmt.Printf(displayfmt, "  --filtercolor", "filter based on color category <30 Green, >30 <70 Orange, >70 Red")
-	fmt.Printf(displayfmt, "  --filterlabels", "filter based on labels")
+	fmt.Printf(displayfmt, "  --filterlabel", "filter based on labels")
 	fmt.Printf(displayfmt, "  --desc", "to enable reverse sort")
 	fmt.Printf(displayfmt, "  --debug", "enable debug mode")
 	fmt.Printf(displayfmt, "  --metrics", utils.PrintValidMetrics())
+	fmt.Printf(displayfmt, "  --label", "choose which label to display")
+	fmt.Printf(displayfmt, "  --noinfo", "disable printing of cluster info")
 	os.Exit(1)
 }
 
@@ -129,7 +131,7 @@ func SortByHandler(m model) {
 
 }
 func ApplyFilters(m model) []k8s.Node {
-	if m.args.FilterLabels != "" {
+	if m.args.FilterLabel != "" {
 		return FilterForLabel(m)
 	} else if m.args.FilterNodes != "" {
 		return FilterForNode(m)
@@ -157,14 +159,6 @@ func FilterForNode(m model) []k8s.Node {
 		}
 	}
 
-	//to-do Regex search of the nodes in FilterNodes
-	//for _, FilteredNode := range FilterNodeInput {
-	//	// if item, Exists or not := Map
-	//	if Node, NodeExists := NodesMap[FilteredNode]; NodeExists {
-	//		filteredNodes = append(filteredNodes, Node)
-	//	}
-	//}
-
 	if len(filteredNodes) > 0 {
 		utils.Logger.Debug("Filter For Node results", filteredNodes)
 		m.nodestats = filteredNodes
@@ -179,9 +173,32 @@ func FilterForNode(m model) []k8s.Node {
 
 func FilterForLabel(m model) []k8s.Node {
 	var filteredNodes []k8s.Node
-	FilterLabelInput := strings.Split(m.args.FilterNodes, ",")
-	utils.Logger.Debug("Filter For Node results", FilterLabelInput)
-	return filteredNodes
+
+	FilterKey := strings.Split(m.args.FilterLabel, "=")[0]
+	FilterValue := strings.Split(m.args.FilterLabel, "=")[1]
+
+	if FilterKey == "" || FilterValue == "" {
+		utils.Logger.Errorf("Filter Key or Value is empty.. Exiting")
+		os.Exit(2)
+	}
+
+	for _, node := range m.nodestats {
+		if _, ok := node.Labels[FilterKey]; ok {
+			if node.Labels[FilterKey] == FilterValue {
+				filteredNodes = append(filteredNodes, node)
+			}
+		}
+	}
+
+	if len(filteredNodes) > 0 {
+		utils.Logger.Debug("Filter For Label results", filteredNodes)
+		m.nodestats = filteredNodes
+		return m.nodestats
+	} else {
+		utils.Logger.Errorf("No matching Nodes found.. Exiting")
+		os.Exit(2)
+		return m.nodestats
+	}
 }
 
 func FilterForColor(m model) []k8s.Node {
@@ -283,8 +300,6 @@ func MetricsHandler(m model, output *strings.Builder) {
 			maxNameWidth = len(node.Name)
 		}
 	}
-
-
 	// Header and Version info
 	
 	fmt.Fprint(output, "\n# KubeNodeUsage\n# Version: 3.0.2\n# https://github.com/AKSarav/Kube-Node-Usage\n\n")
@@ -336,7 +351,7 @@ func MetricsHandler(m model, output *strings.Builder) {
 
 func checkinputs(args *utils.Inputs) {
 
-	IsAllFiltersOn(args)
+	IsAllFiltersOn(args)	
 
 	if args.FilterColor != "" {
 		if !utils.IsValidColor(args.FilterColor) {
@@ -352,12 +367,14 @@ func checkinputs(args *utils.Inputs) {
 		}
 	}
 
+
 	if args.SortBy != "" {
 		if !utils.IsValidSort(args.SortBy) {
 			fmt.Println("Not a valid Sort by option please choose one of", utils.PrintValidSorts())
 			os.Exit(2)
 		}
 	}
+
 }
 
 
@@ -365,10 +382,10 @@ func checkinputs(args *utils.Inputs) {
 func IsAllFiltersOn(args *utils.Inputs) {
 
 	var tempList []string
-	tempList = append(tempList, args.FilterLabels, args.FilterNodes, args.FilterColor)
+	tempList = append(tempList, args.FilterLabel, args.FilterNodes, args.FilterColor)
 	filtersIntegrityValue := 0
 	for _, filter := range tempList {
-		if filter != "" {
+		if filter != ""{
 			filtersIntegrityValue++
 		}
 	}
@@ -393,7 +410,7 @@ func main() {
 		sortby       string
 		filternodes  string
 		filtercolor  string
-		filterlabels string
+		filterlabel string
 		metrics      string
 		label string
 		lblAlias string
@@ -406,7 +423,7 @@ func main() {
 	flag.StringVar(&sortby, "sortby", "name", "sort by name, free, capacity, usage")
 	flag.StringVar(&filternodes, "filternodes", "", "filter nodes based on name")
 	flag.StringVar(&filtercolor, "filtercolor", "", "filter nodes based on color")
-	flag.StringVar(&filterlabels, "filterlabels", "", "filter nodes based on labels")
+	flag.StringVar(&filterlabel, "filterlabel", "", "filter nodes based on labels")
 	flag.StringVar(&metrics, "metrics", "memory", "choose which metrics to display (memory, cpu, disk)")
 	flag.StringVar(&label, "label", "", "choose which label to display")
 	flag.BoolVar(&noinfo, "noinfo", false, "disable printing of cluster info")
@@ -440,7 +457,7 @@ func main() {
 		SortBy:       sortby,
 		FilterNodes:  filternodes,
 		FilterColor:  filtercolor,
-		FilterLabels: filterlabels,
+		FilterLabel: filterlabel,
 		Metrics:      metrics,
 		LabelToDisplay: label,
 		LabelAlias: lblAlias,
