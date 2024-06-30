@@ -11,4 +11,5 @@ type Inputs struct {
 	Metrics      string
 	LabelToDisplay string
 	LabelAlias string
+	NoInfo  bool
 }

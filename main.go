@@ -287,9 +287,11 @@ func MetricsHandler(m model, output *strings.Builder) {
 
 	// Header and Version info
 	
-	fmt.Fprint(output, "\n# KubeNodeUsage\n# Version: 3.0.1\n# https://github.com/AKSarav/Kube-Node-Usage\n\n")
+	fmt.Fprint(output, "\n# KubeNodeUsage\n# Version: 3.0.2\n# https://github.com/AKSarav/Kube-Node-Usage\n\n")
 
-	fmt.Fprint(output, "\n# Context: ",m.clusterinfo.Context,"\n# Version: ",m.clusterinfo.Version,"\n# URL: ",m.clusterinfo.URL,"\n\n")
+	if !m.args.NoInfo {
+		fmt.Fprint(output, "\n# Context: ",m.clusterinfo.Context,"\n# Version: ",m.clusterinfo.Version,"\n# URL: ",m.clusterinfo.URL,"\n\n")
+	}
 
 	fmt.Fprint(output, "# ", strcase.ToCamel(m.args.Metrics)," Metrics\n\n")
 	headlinePrinter(&m ,output, &filteredNodes, &maxNameWidth)
@@ -395,6 +397,7 @@ func main() {
 		metrics      string
 		label string
 		lblAlias string
+		noinfo bool
 	)
 
 	flag.BoolVar(&helpFlag, "help", false, "to display help")
@@ -406,6 +409,7 @@ func main() {
 	flag.StringVar(&filterlabels, "filterlabels", "", "filter nodes based on labels")
 	flag.StringVar(&metrics, "metrics", "memory", "choose which metrics to display (memory, cpu, disk)")
 	flag.StringVar(&label, "label", "", "choose which label to display")
+	flag.BoolVar(&noinfo, "noinfo", false, "disable printing of cluster info")
 
 	flag.Parse()
 
@@ -440,6 +444,7 @@ func main() {
 		Metrics:      metrics,
 		LabelToDisplay: label,
 		LabelAlias: lblAlias,
+		NoInfo: noinfo,
 	}
 
 	checkinputs(&args) // sending the args using Address of Operator
