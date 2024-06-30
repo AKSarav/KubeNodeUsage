@@ -40,11 +40,11 @@ func usage() {
 	fmt.Printf(displayfmt, "  --sortby", utils.PrintValidSorts())
 	fmt.Printf(displayfmt, "  --filternodes", "filter based on node name")
 	fmt.Printf(displayfmt, "  --filtercolor", "filter based on color category <30 Green, >30 <70 Orange, >70 Red")
-	fmt.Printf(displayfmt, "  --filterlabel", "filter based on labels")
+	fmt.Printf(displayfmt, "  --filterlabel", "filter based on labels input should be key value pair in labelkey=labelvalue format")
 	fmt.Printf(displayfmt, "  --desc", "to enable reverse sort")
 	fmt.Printf(displayfmt, "  --debug", "enable debug mode")
 	fmt.Printf(displayfmt, "  --metrics", utils.PrintValidMetrics())
-	fmt.Printf(displayfmt, "  --label", "choose which label to display")
+	fmt.Printf(displayfmt, "  --label", "choose which label to display - syntax is labelname#alias here alias represents the column name to show in the output")
 	fmt.Printf(displayfmt, "  --noinfo", "disable printing of cluster info")
 	os.Exit(1)
 }
