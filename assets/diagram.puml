@@ -1,0 +1,65 @@
+@startuml
+namespace k8s {
+    class Cluster << (S,Aquamarine) >> {
+        + Context string
+        + Version string
+        + URL string
+
+    }
+    class Node << (S,Aquamarine) >> {
+        + Name string
+        + Capacity_disk int
+        + Capacity_memory int
+        + Capacity_cpu int
+        + Usage_disk int
+        + Usage_memory int
+        + Usage_cpu float32
+        + Free_disk int
+        + Free_memory int
+        + Free_cpu float32
+        + Usage_disk_percent float32
+        + Usage_memory_percent float32
+        + Usage_cpu_percent float32
+        + TotalPods string
+
+    }
+}
+
+
+namespace main {
+    class main.tickMsg << (T, #FF7700) >>  {
+    }
+    class model << (S,Aquamarine) >> {
+        - clusterinfo k8s.Cluster
+        - nodestats []k8s.Node
+        - args *utils.Inputs
+
+        + Init() bubbletea.Cmd
+        + Update(msg bubbletea.Msg) (bubbletea.Model, bubbletea.Cmd)
+        + View() string
+
+    }
+    class "time.Time" as timeTime {
+        'This class was created so that we can correctly have an alias pointing to this name. Since it contains dots that can break namespaces
+    }
+}
+
+
+namespace utils {
+    class Inputs << (S,Aquamarine) >> {
+        + HelpFlag bool
+        + ReverseFlag bool
+        + Debug bool
+        + SortBy string
+        + FilterNodes string
+        + FilterColor string
+        + FilterLabel string
+        + Metrics string
+        + LabelToDisplay string
+
+    }
+}
+
+
+"main.timeTime" #.. "main.tickMsg"
+@enduml

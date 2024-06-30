@@ -33,6 +33,7 @@ type Node struct {
 	Usage_cpu_percent    float32
 	TotalPods             string
 	LabelToDisplay 		 string
+	Labels 			    map[string]string
 }
 
 type Cluster struct{
@@ -84,6 +85,9 @@ func ClusterInfo()(Cluster){
 	
 }
 
+// This Go function takes in node statistics, node information, node metrics, a specific metric, and
+// returns an array of nodes.
+// responsible for collecting memory, cpu, and disk statistics for each node
 func GetMetricsForNode(nodestats *Node, node *core.Node, nm *v1beta1.NodeMetrics, metric string)([]Node) {
 
 	NodeMetrics := []Node{}
@@ -227,6 +231,7 @@ func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 
 	nodestats := Node{}
 
+	// Parsing Every Node and collecting information
 	for _, nm := range nodeMetrics.Items {
 		for _, node := range nodes.Items {
 			if node.Name == nm.Name {
@@ -242,8 +247,19 @@ func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 				}
 				nodestats.TotalPods = strconv.Itoa(totalpods)
 				
-				lblToDisplay := inputs.LabelToDisplay
-				nodestats.LabelToDisplay = node.Labels[lblToDisplay]
+				// Display Label if provided - Logic
+				if inputs.LabelToDisplay != "" {
+					// check if the label exists in the node - if not, set output to "Not Found"
+					if _, ok := node.Labels[inputs.LabelToDisplay]; !ok {
+						fmt.Println("Label does not exist in the Node")
+						nodestats.LabelToDisplay = "Not Found"
+					} else{
+						nodestats.LabelToDisplay = node.Labels[inputs.LabelToDisplay]
+					}
+				}
+
+				// Collect all the labels and store in a map
+				nodestats.Labels = node.Labels
 
 				NodeStatsList = append(NodeStatsList, GetMetricsForNode(&nodestats, &node, &nm, metric)[0])
 				
