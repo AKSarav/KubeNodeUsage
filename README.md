@@ -18,9 +18,10 @@ KubeNodeUsage helps you to monitor the **CPU**, **Memory** and **Disk** usage of
 
 The output can be sorted, filtered, and customized based on your requirements
 
-KubeNodeUsage has different filters to filter the output based on 
 
-&nbsp;
+## Features in NutShell 
+
+KubeNodeUsage has different filters to filter the output based on 
 
 * NodeName
 * Usage 
