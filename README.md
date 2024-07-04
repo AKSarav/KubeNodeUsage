@@ -73,7 +73,7 @@ We have example commands and screenshots to help you. Feel free to reach out for
 
 :sparkle: Screenshot of Version 3.0.2 with Label Column and Total Pods Count with `-noinfo` flag ( to turn off Cluster Info) 
 
-![Alt text](assets/KubeNodeUsage-V3.0.2.PNG)
+![Alt text](assets/KubeNodeUsage-V3.0.2.png)
 
 :sparkle: Screenshot of Multiple RegEx patterns with FilterNodes
 
