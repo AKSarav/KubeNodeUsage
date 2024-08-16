@@ -17,6 +17,7 @@ import (
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
+
 type Node struct {
 	Name                 string
 	Capacity_disk        int
@@ -34,6 +35,23 @@ type Node struct {
 	TotalPods             string
 	LabelToDisplay 		 string
 	Labels 			    map[string]string
+	PodStats 			[]PodStats
+}
+
+type ContainerUsage struct {
+	CPUUsage   int
+	MemoryUsage int
+	DiskUsage int
+	CPUUsagePercent int
+	MemoryUsagePercent int
+	DiskUsagePercent int
+}
+
+type PodStats struct {
+	PodName string
+	Namespace string
+	ContainerName string
+	Usage ContainerUsage
 }
 
 type Cluster struct{
@@ -172,6 +190,87 @@ func GetMetricsForNode(nodestats *Node, node *core.Node, nm *v1beta1.NodeMetrics
 }
 
 
+func GetPodMetricsByPodName(mc *metricsv.Clientset,namespace string, podName string)(*ContainerUsage){
+	utils.Logger.Debug("Collecting Metric for Pod",podName)
+	pm, err := mc.MetricsV1beta1().PodMetricses(namespace).Get(context.TODO(), podName, v1.GetOptions{})
+	if err != nil {
+		utils.Logger.Debug("Error getting Pod Metrics for Pod:", err)
+		return &ContainerUsage{}
+	}
+	var cu ContainerUsage
+	for _, container := range pm.Containers {
+		cu.CPUUsage = int(container.Usage.Cpu().Value())
+		cu.MemoryUsage = int(container.Usage.Memory().Value())
+		cu.DiskUsage = int(container.Usage.Storage().Value())
+	}
+	return &cu
+}
+
+func ProcessNode(pods *core.PodList, node core.Node, mc *metricsv.Clientset, nm *v1beta1.NodeMetrics, inputs *utils.Inputs, metric string, nodestats *Node) ([]Node) {
+	var totalpods int
+
+		// Collect all the labels and store in a map
+	nodestats.Labels = node.Labels
+
+	metricsOfNode := GetMetricsForNode(nodestats, &node, nm, metric)[0]
+
+
+	for _, pod := range pods.Items {
+		// Check if the Pod is running on the Node
+		if pod.Spec.NodeName == node.Name {
+			// Collect Total Pods all the time
+			totalpods++
+			// Collect Pod Metrics only if the flag is set
+			if inputs.Pods {
+				cu := GetPodMetricsByPodName(mc, pod.Namespace, pod.Name)
+
+				if metric == "cpu" {
+					usage := float64(cu.CPUUsage/1024/1024)
+					max := float64(metricsOfNode.Capacity_cpu / 1000)
+					cu.CPUUsagePercent = int(usage / max * 100)
+				} else if metric == "memory" {
+					usage := float64(cu.MemoryUsage/1024/1024)
+					max := float64(metricsOfNode.Capacity_memory / 1000)
+					cu.MemoryUsagePercent = int(usage / max * 100)
+				} else if metric == "disk" {
+					usage := float64(cu.DiskUsage/1024/1024)
+					max := float64(metricsOfNode.Capacity_disk)
+					cu.DiskUsagePercent = int(usage / max * 100)
+				}
+				fmt.Println("cu.CPUUsage, nodestats.Capacity_cpu, cu.CPUUsagePercent",cu.CPUUsage, nodestats.Capacity_cpu, cu.CPUUsagePercent)
+				fmt.Println("cu.MemoryUsage, nodestats.Capacity_memory, cu.MemoryUsagePercent",cu.MemoryUsage, nodestats.Capacity_memory, cu.MemoryUsagePercent)
+				fmt.Println("cu.DiskUsage, nodestats.Capacity_disk, cu.DiskUsagePercent",cu.DiskUsage, nodestats.Capacity_disk, cu.DiskUsagePercent)
+
+				ps := PodStats{
+					PodName: pod.Name,
+					Namespace: pod.Namespace,
+					ContainerName: pod.Spec.Containers[0].Name,
+					Usage: *cu,
+				}
+				metricsOfNode.PodStats = append(metricsOfNode.PodStats, ps)
+			}
+		}
+	}
+	metricsOfNode.TotalPods = strconv.Itoa(totalpods)
+	
+	
+	// Display Label if provided - Logic
+	if inputs.LabelToDisplay != "" {
+		// check if the label exists in the node - if not, set output to "Not Found"
+		if _, ok := node.Labels[inputs.LabelToDisplay]; !ok {
+			fmt.Println("Label does not exist in the Node")
+			metricsOfNode.LabelToDisplay = "Not Found"
+		} else{
+			metricsOfNode.LabelToDisplay = node.Labels[inputs.LabelToDisplay]
+		}
+	}
+
+	NodeStatsList = append(NodeStatsList, metricsOfNode)
+	return NodeStatsList
+
+	
+}
+
 func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 
 	metric := inputs.Metrics
@@ -216,6 +315,7 @@ func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 		panic(err.Error())
 	}
 
+
 	
 
 	// output comes in this format
@@ -235,40 +335,24 @@ func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 	for _, nm := range nodeMetrics.Items {
 		for _, node := range nodes.Items {
 			if node.Name == nm.Name {
-				// fmt.Println("Node Name:", node.Name)
+				utils.Logger.Debug("Processing Node",node.Name)
 				nodestats.Name = node.Name
 
-				// Counting Total Pods in the Node
-				var totalpods int
-				for _, pod := range pods.Items {
-					if pod.Spec.NodeName == node.Name {
-						totalpods++
+				filteredNodes := strings.Split(inputs.FilterNodes, ",")
+				if inputs.FilterNodes != "" {
+					for _, n := range filteredNodes {
+						if n == node.Name {
+							NodeStatsList = ProcessNode(pods, node, mc, &nm, inputs, metric, &nodestats)
+						}
 					}
+				} else {
+					NodeStatsList = ProcessNode(pods, node, mc, &nm, inputs, metric, &nodestats)
 				}
-				nodestats.TotalPods = strconv.Itoa(totalpods)
-				
-				// Display Label if provided - Logic
-				if inputs.LabelToDisplay != "" {
-					// check if the label exists in the node - if not, set output to "Not Found"
-					if _, ok := node.Labels[inputs.LabelToDisplay]; !ok {
-						fmt.Println("Label does not exist in the Node")
-						nodestats.LabelToDisplay = "Not Found"
-					} else{
-						nodestats.LabelToDisplay = node.Labels[inputs.LabelToDisplay]
-					}
-				}
-
-				// Collect all the labels and store in a map
-				nodestats.Labels = node.Labels
-
-				NodeStatsList = append(NodeStatsList, GetMetricsForNode(&nodestats, &node, &nm, metric)[0])
-				
 			}
 
 		}
 	}
-
-	utils.Logger.Debug(NodeStatsList)
+	fmt.Println(NodeStatsList)
 	return NodeStatsList
 
 }

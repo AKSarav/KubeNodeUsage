@@ -12,4 +12,5 @@ type Inputs struct {
 	LabelToDisplay string
 	LabelAlias string
 	NoInfo  bool
+	Pods	bool
 }

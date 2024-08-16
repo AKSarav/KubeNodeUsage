@@ -46,6 +46,7 @@ func usage() {
 	fmt.Printf(displayfmt, "  --metrics", utils.PrintValidMetrics())
 	fmt.Printf(displayfmt, "  --label", "choose which label to display - syntax is labelname#alias here alias represents the column name to show in the output")
 	fmt.Printf(displayfmt, "  --noinfo", "disable printing of cluster info")
+	fmt.Printf(displayfmt, "  --pods", "to display pod usage")
 	os.Exit(1)
 }
 
@@ -70,6 +71,9 @@ func DebugView(m model, output *strings.Builder) {
 		fmt.Fprint(output, " \nDebug mode enabled")
 		fmt.Fprint(output, "\nArgs: ", m.args)
 		fmt.Fprint(output, "\nNodes: ", m.nodestats)
+
+		// Set the log level
+		utils.Logger.SetLevel(logrus.DebugLevel)
 	}
 }
 
@@ -249,8 +253,8 @@ func FilterForColor(m model) []k8s.Node {
 
 }
 
-func PrintDesign(output *strings.Builder, maxNameWidth int) {
-	lines := strings.Repeat("-", maxNameWidth+12+12+20)
+func PrintDesign(output *strings.Builder, width int) {
+	lines := strings.Repeat("-", width)
 	fmt.Fprint(output, lines)
 	fmt.Fprint(output, "\n")
 }
@@ -309,30 +313,74 @@ func MetricsHandler(m model, output *strings.Builder) {
 	}
 
 	fmt.Fprint(output, "# ", strcase.ToCamel(m.args.Metrics)," Metrics\n\n")
-	headlinePrinter(&m ,output, &filteredNodes, &maxNameWidth)
-	PrintDesign(output, maxNameWidth)
+	
+	podDisplayFormat := "%-25s %-15s %-15s %-9s %-9s %-15s %s\n"
+	if m.args.Pods { 
+		unit := getUnit(m.args.Metrics)
+		freeHeading := "Free(" + unit+")"
+		maxHeading := "Max(" + unit+")"
+		fmt.Fprintf(output, podDisplayFormat, "Pod", "Container", "Namespace", freeHeading, maxHeading, "Node",  "Usage%")
+		PrintDesign(output, 130)
+	}else
+	{
+		headlinePrinter(&m ,output, &filteredNodes, &maxNameWidth)
+		PrintDesign(output, 100)
+	}
+
 
 	if m.args.Metrics == "memory" {
 		for _, node := range filteredNodes {
-			prog := GetBar(float64(node.Usage_memory_percent) / 100.0)
-			values := []interface{}{node.Name, strconv.Itoa(node.Free_memory/1024), strconv.Itoa(node.Capacity_memory/1024), node.TotalPods}
-			if m.args.LabelToDisplay != "" {
-				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
-			} else {
-				values = append(values, prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
+			if !m.args.Pods {
+				prog := GetBar(float64(node.Usage_memory_percent) / 100.0)
+				values := []interface{}{node.Name, strconv.Itoa(node.Free_memory/1024), strconv.Itoa(node.Capacity_memory/1024), node.TotalPods}
+				if m.args.LabelToDisplay != "" {
+					values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
+				} else {
+					values = append(values, prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
+				}
+				fmt.Fprintf(output, m.format, values...)
+			}else {				
+				for _, pod := range node.PodStats{
+					prog := GetBar(float64(pod.Usage.MemoryUsage) / 100.0)
+					values := []interface{}{
+						TruncateString(pod.PodName, 25), 
+						TruncateString(pod.ContainerName, 15),
+						TruncateString(pod.Namespace, 15),
+						strconv.Itoa(pod.Usage.MemoryUsage/1024), 
+						strconv.Itoa(node.Capacity_memory/1024),
+						TruncateString(node.Name, 15),
+					}
+					values = append(values, prog.ViewAs(float64(pod.Usage.MemoryUsagePercent)/100.0))
+					fmt.Fprintf(output, podDisplayFormat, values...)
+				}
 			}
-			fmt.Fprintf(output, m.format, values...)
 		}
 	} else if m.args.Metrics == "cpu" {
 		for _, node := range filteredNodes {
-			prog := GetBar(float64(node.Usage_cpu_percent) / 100.0)
-			values := []interface{}{node.Name, strconv.Itoa(int(node.Free_cpu)), strconv.Itoa(node.Capacity_cpu), node.TotalPods}
-			if m.args.LabelToDisplay != "" {
-				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
-			} else {
-				values = append(values, prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
+			if !m.args.Pods {
+				prog := GetBar(float64(node.Usage_cpu_percent) / 100.0)
+				values := []interface{}{node.Name, strconv.Itoa(int(node.Free_cpu)/1000), strconv.Itoa(node.Capacity_cpu/1000), node.TotalPods}
+				if m.args.LabelToDisplay != "" {
+					values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
+				} else {
+					values = append(values, prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
+				}
+				fmt.Fprintf(output, m.format, values...)
+			}else {				
+				for _, pod := range node.PodStats{
+					prog := GetBar(float64(pod.Usage.CPUUsage) / 100.0)
+					values := []interface{}{
+						TruncateString(pod.PodName, 25), 
+						TruncateString(pod.ContainerName, 15),
+						TruncateString(pod.Namespace, 15),
+						strconv.Itoa(pod.Usage.CPUUsage), 
+						strconv.Itoa(node.Capacity_cpu),
+						TruncateString(node.Name, 15),
+					}
+					values = append(values, prog.ViewAs(float64(pod.Usage.CPUUsagePercent)/100.0))
+					fmt.Fprintf(output, podDisplayFormat, values...)
+				}
 			}
-			fmt.Fprintf(output, m.format, values...)
 		}
 	} else if m.args.Metrics == "disk" {
 		for _, node := range filteredNodes {
@@ -342,6 +390,9 @@ func MetricsHandler(m model, output *strings.Builder) {
 				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
 			} else {
 				values = append(values, prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
+			}
+			for _, pod := range node.PodStats{
+				values = append(values, "\n", pod.PodName, pod.ContainerName, pod.Namespace, pod.Usage.DiskUsage)
 			}
 			fmt.Fprintf(output, m.format, values...)
 		}
@@ -395,6 +446,13 @@ func IsAllFiltersOn(args *utils.Inputs) {
 	}
 }
 
+func TruncateString(s string, maxLength int) string {
+    if len(s) > maxLength {
+        return s[:maxLength]
+    }
+    return s
+}
+
 /*
 Function: main
 Description: main function
@@ -415,6 +473,7 @@ func main() {
 		label string
 		lblAlias string
 		noinfo bool
+		pods bool
 	)
 
 	flag.BoolVar(&helpFlag, "help", false, "to display help")
@@ -427,6 +486,7 @@ func main() {
 	flag.StringVar(&metrics, "metrics", "memory", "choose which metrics to display (memory, cpu, disk)")
 	flag.StringVar(&label, "label", "", "choose which label to display")
 	flag.BoolVar(&noinfo, "noinfo", false, "disable printing of cluster info")
+	flag.BoolVar(&pods, "pods", false, "to display pod usage")
 
 	flag.Parse()
 
@@ -462,6 +522,7 @@ func main() {
 		LabelToDisplay: label,
 		LabelAlias: lblAlias,
 		NoInfo: noinfo,
+		Pods: pods,
 	}
 
 	checkinputs(&args) // sending the args using Address of Operator
@@ -495,7 +556,7 @@ type model struct {
 
 // Init Bubble Tea model
 func (m model) Init() tea.Cmd {
-	return tickCmd()
+	return tea.EnterAltScreen
 }
 
 // Update method for Bubble Tea - for constant update loop
