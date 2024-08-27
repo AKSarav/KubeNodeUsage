@@ -1,9 +1,9 @@
 package k8s
 
 import (
+	"KubeNodeUsage/utils"
 	"context"
 	"fmt"
-	"kubenodeusage/utils"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -36,6 +36,7 @@ type Node struct {
 	LabelToDisplay 		 string
 	Labels 			    map[string]string
 	PodStats 			[]PodStats
+	IdleUsagePercent float32
 }
 
 type ContainerUsage struct {
@@ -237,9 +238,9 @@ func ProcessNode(pods *core.PodList, node core.Node, mc *metricsv.Clientset, nm 
 					max := float64(metricsOfNode.Capacity_disk)
 					cu.DiskUsagePercent = int(usage / max * 100)
 				}
-				fmt.Println("cu.CPUUsage, nodestats.Capacity_cpu, cu.CPUUsagePercent",cu.CPUUsage, nodestats.Capacity_cpu, cu.CPUUsagePercent)
-				fmt.Println("cu.MemoryUsage, nodestats.Capacity_memory, cu.MemoryUsagePercent",cu.MemoryUsage, nodestats.Capacity_memory, cu.MemoryUsagePercent)
-				fmt.Println("cu.DiskUsage, nodestats.Capacity_disk, cu.DiskUsagePercent",cu.DiskUsage, nodestats.Capacity_disk, cu.DiskUsagePercent)
+				// fmt.Println("cu.CPUUsage, nodestats.Capacity_cpu, cu.CPUUsagePercent",cu.CPUUsage, nodestats.Capacity_cpu, cu.CPUUsagePercent)
+				// fmt.Println("cu.MemoryUsage, nodestats.Capacity_memory, cu.MemoryUsagePercent",cu.MemoryUsage, nodestats.Capacity_memory, cu.MemoryUsagePercent)
+				// fmt.Println("cu.DiskUsage, nodestats.Capacity_disk, cu.DiskUsagePercent",cu.DiskUsage, nodestats.Capacity_disk, cu.DiskUsagePercent)
 
 				ps := PodStats{
 					PodName: pod.Name,
@@ -352,7 +353,6 @@ func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 
 		}
 	}
-	fmt.Println(NodeStatsList)
 	return NodeStatsList
 
 }

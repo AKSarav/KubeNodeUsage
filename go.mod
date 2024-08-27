@@ -1,4 +1,4 @@
-module kubenodeusage
+module KubeNodeUsage
 
 go 1.22.0
 

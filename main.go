@@ -1,10 +1,10 @@
 package main
 
 import (
+	"KubeNodeUsage/k8s"
+	"KubeNodeUsage/utils"
 	"flag"
 	"fmt"
-	"kubenodeusage/k8s"
-	"kubenodeusage/utils"
 	"os"
 	"reflect"
 	"regexp"
@@ -66,7 +66,7 @@ func PrintArgs(args utils.Inputs) {
 
 }
 
-func DebugView(m model, output *strings.Builder) {
+func DebugView(m nodeusage, output *strings.Builder) {
 	if m.args.Debug {
 		fmt.Fprint(output, " \nDebug mode enabled")
 		fmt.Fprint(output, "\nArgs: ", m.args)
@@ -77,7 +77,7 @@ func DebugView(m model, output *strings.Builder) {
 	}
 }
 
-func RightMetric(m model, index int) float32 {
+func RightMetric(m nodeusage, index int) float32 {
 
 	switch m.args.Metrics {
 	case "memory":
@@ -109,7 +109,7 @@ func RightMetric(m model, index int) float32 {
 	return m.nodestats[index].Usage_memory_percent
 }
 
-func SortByHandler(m model) {
+func SortByHandler(m nodeusage) {
 
 	if m.args.SortBy != "" && m.args.SortBy != "name" && m.args.SortBy != "node" {
 		if !m.args.ReverseFlag {
@@ -134,7 +134,7 @@ func SortByHandler(m model) {
 	}
 
 }
-func ApplyFilters(m model) []k8s.Node {
+func ApplyFilters(m nodeusage) []k8s.Node {
 	if m.args.FilterLabel != "" {
 		return FilterForLabel(m)
 	} else if m.args.FilterNodes != "" {
@@ -146,7 +146,7 @@ func ApplyFilters(m model) []k8s.Node {
 	}
 }
 
-func FilterForNode(m model) []k8s.Node {
+func FilterForNode(m nodeusage) []k8s.Node {
 	var filteredNodes []k8s.Node
 	FilterNodeInput := strings.Split(m.args.FilterNodes, ",")
 
@@ -175,7 +175,7 @@ func FilterForNode(m model) []k8s.Node {
 
 }
 
-func FilterForLabel(m model) []k8s.Node {
+func FilterForLabel(m nodeusage) []k8s.Node {
 	var filteredNodes []k8s.Node
 
 	FilterKey := strings.Split(m.args.FilterLabel, "=")[0]
@@ -205,7 +205,7 @@ func FilterForLabel(m model) []k8s.Node {
 	}
 }
 
-func FilterForColor(m model) []k8s.Node {
+func FilterForColor(m nodeusage) []k8s.Node {
 	utils.Logger.Debug("Filter for Color called")
 	var filteredNodes []k8s.Node
 	var thresholdMin, thresholdMax float64
@@ -269,7 +269,7 @@ func getUnit(metricType string) string {
 	return unit
 }
 
-func headlinePrinter(m *model, output *strings.Builder, Nodes *[]k8s.Node, maxNameWidth *int) {
+func headlinePrinter(m *nodeusage, output *strings.Builder, Nodes *[]k8s.Node, maxNameWidth *int) {
 
 	
 	unit := getUnit(m.args.Metrics)
@@ -289,7 +289,7 @@ func headlinePrinter(m *model, output *strings.Builder, Nodes *[]k8s.Node, maxNa
 	
 }
 
-func MetricsHandler(m model, output *strings.Builder) {
+func MetricsHandler(m nodeusage, output *strings.Builder) {
 
 	// Nodes Filtering based on filters
 	filteredNodes := ApplyFilters(m)
@@ -317,12 +317,11 @@ func MetricsHandler(m model, output *strings.Builder) {
 	podDisplayFormat := "%-25s %-15s %-15s %-9s %-9s %-15s %s\n"
 	if m.args.Pods { 
 		unit := getUnit(m.args.Metrics)
-		freeHeading := "Free(" + unit+")"
-		maxHeading := "Max(" + unit+")"
-		fmt.Fprintf(output, podDisplayFormat, "Pod", "Container", "Namespace", freeHeading, maxHeading, "Node",  "Usage%")
+		freeHeading := "Used(" + unit+")"
+		maxHeading := "NodeMax(" + unit+")"
+		fmt.Fprintf(output, podDisplayFormat, "Pod", "Container", "Namespace", freeHeading, maxHeading, "Node",  "Usage %")
 		PrintDesign(output, 130)
-	}else
-	{
+	}else{
 		headlinePrinter(&m ,output, &filteredNodes, &maxNameWidth)
 		PrintDesign(output, 100)
 	}
@@ -340,19 +339,27 @@ func MetricsHandler(m model, output *strings.Builder) {
 				}
 				fmt.Fprintf(output, m.format, values...)
 			}else {				
+				TotalPodUsage := 0
 				for _, pod := range node.PodStats{
-					prog := GetBar(float64(pod.Usage.MemoryUsage) / 100.0)
+					prog := GetBar(float64(pod.Usage.MemoryUsagePercent) / 100.0)
+					TotalPodUsage += pod.Usage.MemoryUsage
 					values := []interface{}{
 						TruncateString(pod.PodName, 25), 
 						TruncateString(pod.ContainerName, 15),
 						TruncateString(pod.Namespace, 15),
-						strconv.Itoa(pod.Usage.MemoryUsage/1024), 
+						strconv.Itoa(pod.Usage.MemoryUsage/1024/1024), 
 						strconv.Itoa(node.Capacity_memory/1024),
 						TruncateString(node.Name, 15),
 					}
 					values = append(values, prog.ViewAs(float64(pod.Usage.MemoryUsagePercent)/100.0))
 					fmt.Fprintf(output, podDisplayFormat, values...)
 				}
+
+				IdleUsage := node.Capacity_memory - TotalPodUsage
+
+				// Adding the Idle Usage to the Node - TODO: Need to find a better way to display this
+				node.IdleUsagePercent = float32((IdleUsage / node.Capacity_memory) * 100)
+
 			}
 		}
 	} else if m.args.Metrics == "cpu" {
@@ -368,7 +375,7 @@ func MetricsHandler(m model, output *strings.Builder) {
 				fmt.Fprintf(output, m.format, values...)
 			}else {				
 				for _, pod := range node.PodStats{
-					prog := GetBar(float64(pod.Usage.CPUUsage) / 100.0)
+					prog := GetBar(float64(pod.Usage.CPUUsagePercent) / 100.0)
 					values := []interface{}{
 						TruncateString(pod.PodName, 25), 
 						TruncateString(pod.ContainerName, 15),
@@ -532,7 +539,7 @@ func main() {
 	}
 
 	// Model Intialized here - Start of the Program
-	mdl := model{}
+	mdl := nodeusage{}
 	mdl.args = &args
 	mdl.clusterinfo = k8s.ClusterInfo()
 	mdl.nodestats = k8s.Nodes(&args)
@@ -547,7 +554,7 @@ func main() {
 type tickMsg time.Time
 
 // model is the Bubble Tea model.
-type model struct {
+type nodeusage struct {
 	clusterinfo k8s.Cluster
 	nodestats []k8s.Node
 	args      *utils.Inputs
@@ -555,12 +562,12 @@ type model struct {
 }
 
 // Init Bubble Tea model
-func (m model) Init() tea.Cmd {
+func (m nodeusage) Init() tea.Cmd {
 	return tea.EnterAltScreen
 }
 
 // Update method for Bubble Tea - for constant update loop
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m nodeusage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
@@ -589,12 +596,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func GetBar(decider float64) progress.Model {
-
 	decider = decider * 100
 
 	var prog progress.Model
 	// decide which color to use based on the usage percentage below 30% is green, above 70% is red, else yellow
-	if decider < 30 {
+	if decider < 1 {
+		prog = progress.New(progress.WithScaledGradient("#0bad5d", "#626262"))
+	} else if decider < 30 {
 		prog = progress.New(progress.WithScaledGradient("#0bad5d", "#74b03f"))
 	} else if decider > 70 {
 		prog = progress.New(progress.WithScaledGradient("#13B013", "#F11658"))
@@ -605,7 +613,7 @@ func GetBar(decider float64) progress.Model {
 }
 
 // View renders bubble tea
-func (m model) View() string {
+func (m nodeusage) View() string {
 
 	var output strings.Builder
 
