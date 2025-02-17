@@ -3,11 +3,12 @@ package k8s
 import (
 	"context"
 	"fmt"
-	"kubenodeusage/utils"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/AKSarav/KubeNodeUsage/utils"
 
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,36 +32,35 @@ type Node struct {
 	Usage_disk_percent   float32
 	Usage_memory_percent float32
 	Usage_cpu_percent    float32
-	TotalPods             string
-	LabelToDisplay 		 string
-	Labels 			    map[string]string
+	TotalPods            string
+	LabelToDisplay       string
+	Labels               map[string]string
 }
 
-type Cluster struct{
+type Cluster struct {
 	Context string
 	Version string
-	URL		string
+	URL     string
 }
 
 var NodeStatsList []Node
 var K8sinfo Cluster
 
-func ClusterInfo()(Cluster){
+func ClusterInfo() Cluster {
 	kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
-	confvar := clientcmd.GetConfigFromFileOrDie(kubeconfig);
-	
+	confvar := clientcmd.GetConfigFromFileOrDie(kubeconfig)
+
 	K8sinfo := Cluster{}
 	K8sinfo.Context = confvar.CurrentContext
 
 	utils.InitLogger()
-	
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		fmt.Println("Not able to access .kube/config file from the Home Directory path: ",kubeconfig)
+		fmt.Println("Not able to access .kube/config file from the Home Directory path: ", kubeconfig)
 		os.Exit(2)
 	}
-	
+
 	mc, err := metricsv.NewForConfig(config)
 	if err != nil {
 		panic(err.Error())
@@ -69,26 +69,24 @@ func ClusterInfo()(Cluster){
 	K8sinfo.URL = config.Host
 
 	// Validate Version of Server
-	if version, err := mc.ServerVersion(); err != nil{
+	if version, err := mc.ServerVersion(); err != nil {
 		fmt.Println("\n# ERROR: Unable to Establish Connection to Kubernetes Cluster")
-		fmt.Println("# Kubernetes Context:",K8sinfo.Context)
-		fmt.Println("# Kubernetes URL:",K8sinfo.URL)
+		fmt.Println("# Kubernetes Context:", K8sinfo.Context)
+		fmt.Println("# Kubernetes URL:", K8sinfo.URL)
 		fmt.Println("# Please check your kubernetes configuration and permissions\n")
 		os.Exit(2)
-	} else{
+	} else {
 		K8sinfo.Version = version.String()
 	}
 
-	
-
 	return K8sinfo
-	
+
 }
 
 // This Go function takes in node statistics, node information, node metrics, a specific metric, and
 // returns an array of nodes.
 // responsible for collecting memory, cpu, and disk statistics for each node
-func GetMetricsForNode(nodestats *Node, node *core.Node, nm *v1beta1.NodeMetrics, metric string)([]Node) {
+func GetMetricsForNode(nodestats *Node, node *core.Node, nm *v1beta1.NodeMetrics, metric string) []Node {
 
 	NodeMetrics := []Node{}
 
@@ -98,7 +96,7 @@ func GetMetricsForNode(nodestats *Node, node *core.Node, nm *v1beta1.NodeMetrics
 		memcapcity, err := strconv.Atoi(strings.TrimSuffix(node.Status.Capacity.Memory().String(), "Ki"))
 		if err != nil {
 			fmt.Println("Error converting Memory capacity")
-		} else{
+		} else {
 			nodestats.Capacity_memory = memcapcity
 		}
 
@@ -149,7 +147,7 @@ func GetMetricsForNode(nodestats *Node, node *core.Node, nm *v1beta1.NodeMetrics
 		diskcapacity, err := strconv.Atoi(strings.TrimSuffix(node.Status.Capacity.StorageEphemeral().String(), "Ki"))
 		if err != nil {
 			fmt.Println("Error converting Disk capacity")
-		} else{
+		} else {
 			nodestats.Capacity_disk = diskcapacity
 		}
 		// fmt.Println("Capacity Disk:", nodestats.Capacity_disk)
@@ -171,7 +169,6 @@ func GetMetricsForNode(nodestats *Node, node *core.Node, nm *v1beta1.NodeMetrics
 	return NodeMetrics
 }
 
-
 func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 
 	metric := inputs.Metrics
@@ -181,10 +178,10 @@ func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		fmt.Println("Not able to access .kube/config file from the Home Directory path: ",kubeconfig)
+		fmt.Println("Not able to access .kube/config file from the Home Directory path: ", kubeconfig)
 		os.Exit(2)
 	}
-	
+
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err.Error())
@@ -216,8 +213,6 @@ func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 		panic(err.Error())
 	}
 
-	
-
 	// output comes in this format
 	//{{270301052 -9} {<nil>} 270301052n DecimalSI}
 	//is reminiscent of how Kubernetes represents resource quantities,
@@ -246,14 +241,14 @@ func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 					}
 				}
 				nodestats.TotalPods = strconv.Itoa(totalpods)
-				
+
 				// Display Label if provided - Logic
 				if inputs.LabelToDisplay != "" {
 					// check if the label exists in the node - if not, set output to "Not Found"
 					if _, ok := node.Labels[inputs.LabelToDisplay]; !ok {
 						fmt.Println("Label does not exist in the Node")
 						nodestats.LabelToDisplay = "Not Found"
-					} else{
+					} else {
 						nodestats.LabelToDisplay = node.Labels[inputs.LabelToDisplay]
 					}
 				}
@@ -262,7 +257,7 @@ func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 				nodestats.Labels = node.Labels
 
 				NodeStatsList = append(NodeStatsList, GetMetricsForNode(&nodestats, &node, &nm, metric)[0])
-				
+
 			}
 
 		}

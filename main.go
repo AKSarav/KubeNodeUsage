@@ -3,8 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"kubenodeusage/k8s"
-	"kubenodeusage/utils"
 	"os"
 	"reflect"
 	"regexp"
@@ -12,6 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/AKSarav/KubeNodeUsage/k8s"
+	"github.com/AKSarav/KubeNodeUsage/utils"
 
 	"github.com/sirupsen/logrus"
 
@@ -257,32 +258,34 @@ func PrintDesign(output *strings.Builder, maxNameWidth int) {
 
 func getUnit(metricType string) string {
 	unit := ""
-	switch metricType{
-		case "memory": unit = "MB"
-		case "cpu": unit = "Cores"
-		case "disk": unit = "GB"
+	switch metricType {
+	case "memory":
+		unit = "MB"
+	case "cpu":
+		unit = "Cores"
+	case "disk":
+		unit = "GB"
 	}
 	return unit
 }
 
 func headlinePrinter(m *model, output *strings.Builder, Nodes *[]k8s.Node, maxNameWidth *int) {
 
-	
 	unit := getUnit(m.args.Metrics)
-	freeHeading := "Free(" + unit+")"
-	maxHeading := "Max(" + unit+")"
+	freeHeading := "Free(" + unit + ")"
+	maxHeading := "Max(" + unit + ")"
 
 	values := []interface{}{"Name", freeHeading, maxHeading, "Pods"}
 	if m.args.LabelToDisplay != "" {
 		m.format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-10s %-10s %-5s %-12s %s\n"
 		values = append(values, m.args.LabelAlias, "Usage%")
-		*maxNameWidth = *maxNameWidth+12
+		*maxNameWidth = *maxNameWidth + 12
 	} else {
 		m.format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-10s %-10s %-5s %s\n"
 		values = append(values, "Usage%")
 	}
-	fmt.Fprintf(output, m.format, values...)	
-	
+	fmt.Fprintf(output, m.format, values...)
+
 }
 
 func MetricsHandler(m model, output *strings.Builder) {
@@ -301,21 +304,21 @@ func MetricsHandler(m model, output *strings.Builder) {
 		}
 	}
 	// Header and Version info
-	
+
 	fmt.Fprint(output, "\n# KubeNodeUsage\n# Version: 3.0.2\n# https://github.com/AKSarav/Kube-Node-Usage\n\n")
 
 	if !m.args.NoInfo {
-		fmt.Fprint(output, "\n# Context: ",m.clusterinfo.Context,"\n# Version: ",m.clusterinfo.Version,"\n# URL: ",m.clusterinfo.URL,"\n\n")
+		fmt.Fprint(output, "\n# Context: ", m.clusterinfo.Context, "\n# Version: ", m.clusterinfo.Version, "\n# URL: ", m.clusterinfo.URL, "\n\n")
 	}
 
-	fmt.Fprint(output, "# ", strcase.ToCamel(m.args.Metrics)," Metrics\n\n")
-	headlinePrinter(&m ,output, &filteredNodes, &maxNameWidth)
+	fmt.Fprint(output, "# ", strcase.ToCamel(m.args.Metrics), " Metrics\n\n")
+	headlinePrinter(&m, output, &filteredNodes, &maxNameWidth)
 	PrintDesign(output, maxNameWidth)
 
 	if m.args.Metrics == "memory" {
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_memory_percent) / 100.0)
-			values := []interface{}{node.Name, strconv.Itoa(node.Free_memory/1024), strconv.Itoa(node.Capacity_memory/1024), node.TotalPods}
+			values := []interface{}{node.Name, strconv.Itoa(node.Free_memory / 1024), strconv.Itoa(node.Capacity_memory / 1024), node.TotalPods}
 			if m.args.LabelToDisplay != "" {
 				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
 			} else {
@@ -337,7 +340,7 @@ func MetricsHandler(m model, output *strings.Builder) {
 	} else if m.args.Metrics == "disk" {
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_disk_percent) / 100.0)
-			values := []interface{}{node.Name, strconv.Itoa(node.Free_disk/1024/1024), strconv.Itoa(node.Capacity_disk/1024/1024), node.TotalPods}
+			values := []interface{}{node.Name, strconv.Itoa(node.Free_disk / 1024 / 1024), strconv.Itoa(node.Capacity_disk / 1024 / 1024), node.TotalPods}
 			if m.args.LabelToDisplay != "" {
 				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
 			} else {
@@ -351,7 +354,7 @@ func MetricsHandler(m model, output *strings.Builder) {
 
 func checkinputs(args *utils.Inputs) {
 
-	IsAllFiltersOn(args)	
+	IsAllFiltersOn(args)
 
 	if args.FilterColor != "" {
 		if !utils.IsValidColor(args.FilterColor) {
@@ -367,7 +370,6 @@ func checkinputs(args *utils.Inputs) {
 		}
 	}
 
-
 	if args.SortBy != "" {
 		if !utils.IsValidSort(args.SortBy) {
 			fmt.Println("Not a valid Sort by option please choose one of", utils.PrintValidSorts())
@@ -377,15 +379,13 @@ func checkinputs(args *utils.Inputs) {
 
 }
 
-
-
 func IsAllFiltersOn(args *utils.Inputs) {
 
 	var tempList []string
 	tempList = append(tempList, args.FilterLabel, args.FilterNodes, args.FilterColor)
 	filtersIntegrityValue := 0
 	for _, filter := range tempList {
-		if filter != ""{
+		if filter != "" {
 			filtersIntegrityValue++
 		}
 	}
@@ -404,17 +404,17 @@ func main() {
 	// clearScreen()
 	// parse command line arguments
 	var (
-		helpFlag     bool
-		reverseFlag  bool
-		debug        bool
-		sortby       string
-		filternodes  string
-		filtercolor  string
+		helpFlag    bool
+		reverseFlag bool
+		debug       bool
+		sortby      string
+		filternodes string
+		filtercolor string
 		filterlabel string
-		metrics      string
-		label string
-		lblAlias string
-		noinfo bool
+		metrics     string
+		label       string
+		lblAlias    string
+		noinfo      bool
 	)
 
 	flag.BoolVar(&helpFlag, "help", false, "to display help")
@@ -439,8 +439,7 @@ func main() {
 		utils.Logger.SetLevel(logrus.DebugLevel)
 	}
 
-
-	if (label != ""){
+	if label != "" {
 		if strings.Contains(label, "#") {
 			lblAlias = strings.Split(label, "#")[1]
 			label = strings.Split(label, "#")[0]
@@ -451,17 +450,17 @@ func main() {
 	}
 
 	args := utils.Inputs{
-		HelpFlag:     helpFlag,
-		ReverseFlag:  reverseFlag,
-		Debug:        debug,
-		SortBy:       sortby,
-		FilterNodes:  filternodes,
-		FilterColor:  filtercolor,
-		FilterLabel: filterlabel,
-		Metrics:      metrics,
+		HelpFlag:       helpFlag,
+		ReverseFlag:    reverseFlag,
+		Debug:          debug,
+		SortBy:         sortby,
+		FilterNodes:    filternodes,
+		FilterColor:    filtercolor,
+		FilterLabel:    filterlabel,
+		Metrics:        metrics,
 		LabelToDisplay: label,
-		LabelAlias: lblAlias,
-		NoInfo: noinfo,
+		LabelAlias:     lblAlias,
+		NoInfo:         noinfo,
 	}
 
 	checkinputs(&args) // sending the args using Address of Operator
@@ -475,7 +474,7 @@ func main() {
 	mdl.args = &args
 	mdl.clusterinfo = k8s.ClusterInfo()
 	mdl.nodestats = k8s.Nodes(&args)
-	
+
 	if _, err := tea.NewProgram(mdl).Run(); err != nil {
 		fmt.Println("Oh no!", err)
 		os.Exit(1)
@@ -488,9 +487,9 @@ type tickMsg time.Time
 // model is the Bubble Tea model.
 type model struct {
 	clusterinfo k8s.Cluster
-	nodestats []k8s.Node
-	args      *utils.Inputs
-	format	string
+	nodestats   []k8s.Node
+	args        *utils.Inputs
+	format      string
 }
 
 // Init Bubble Tea model

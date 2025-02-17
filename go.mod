@@ -1,4 +1,4 @@
-module kubenodeusage
+module github.com/AKSarav/KubeNodeUsage
 
 go 1.20
 
