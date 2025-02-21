@@ -1,4 +1,4 @@
-module github.com/AKSarav/KubeNodeUsage
+module github.com/AKSarav/KubeNodeUsage/v3
 
 go 1.20
 

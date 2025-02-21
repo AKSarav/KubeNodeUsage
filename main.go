@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AKSarav/KubeNodeUsage/k8s"
-	"github.com/AKSarav/KubeNodeUsage/utils"
+	"github.com/AKSarav/KubeNodeUsage/v3/k8s"
+	"github.com/AKSarav/KubeNodeUsage/v3/utils"
 
 	"github.com/sirupsen/logrus"
 
