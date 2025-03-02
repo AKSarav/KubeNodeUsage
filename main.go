@@ -23,6 +23,7 @@ import (
 )
 
 var helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")).Render
+var semver = "v3.0.3"
 
 // map of keys of string type and values of interface type
 // Keys are strings.
@@ -305,7 +306,7 @@ func MetricsHandler(m model, output *strings.Builder) {
 	}
 	// Header and Version info
 
-	fmt.Fprint(output, "\n# KubeNodeUsage\n# Version: 3.0.3\n# https://github.com/AKSarav/KubeNodeUsage\n\n")
+	fmt.Fprint(output, "\n# KubeNodeUsage\n# Version: "+semver+"\n# https://github.com/AKSarav/KubeNodeUsage\n\n")
 
 	if !m.args.NoInfo {
 		fmt.Fprint(output, "\n# Context: ", m.clusterinfo.Context, "\n# Version: ", m.clusterinfo.Version, "\n# URL: ", m.clusterinfo.URL, "\n\n")

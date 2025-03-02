@@ -16,7 +16,7 @@ fi
 
 package_name="KubeNodeUsage"
 
-platforms=("windows/amd64" "windows/386" "darwin/amd64" "darwin/arm64" "windows/arm64" "windows/arm" "linux/arm64" "linux/amd64" "linux/arm")
+platforms=("linux/amd64" "linux/arm64" "darwin/amd64" "darwin/arm64"  "windows/amd64" "windows/arm64" "windows/386" "windows/arm" "linux/arm")
 
 # Create a temporary file to store the SHA256 checksums
 checksum_file=$(mktemp)
@@ -51,6 +51,11 @@ do
         exit 1
     fi
 done
+
+# Find the version declaration on the main.go file and change it to the new version
+# var semver = "v3.0.2" 
+echo "Updating the version in main.go"
+sed -i '' "s/var semver = \"v[0-9]*\.[0-9]*\.[0-9]*\"/var semver = \"v$Version\"/g" main.go
 
 # Create the Homebrew formula
 cat <<EOF > kubenodeusage.rb
