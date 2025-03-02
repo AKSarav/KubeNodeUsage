@@ -117,23 +117,21 @@ done < $checksum_file
 cat <<EOF >> kubenodeusage.rb
 
     def install
-      platform = if OS.mac?
-                    "darwin"
-                  elsif OS.linux?
-                    "linux"
-                  elsif OS.windows?
-                    "windows"
-                  end
-
-      arch = if Hardware::CPU.intel?
-                "amd64"
-              elsif Hardware::CPU.arm?
-                "arm64"
-              end
-
-      bin.install "KubeNodeUsage-\#{platform}-\#{arch}" => "KubeNodeUsage"
+    if OS.mac? && Hardware::CPU.intel?
+      bin.install "KubeNodeUsage-darwin-amd64-v#{version}" => "KubeNodeUsage"
+    elsif OS.mac? && Hardware::CPU.arm?
+      bin.install "KubeNodeUsage-darwin-arm64-v#{version}" => "KubeNodeUsage"
+    elsif OS.linux? && Hardware::CPU.intel?
+      bin.install "KubeNodeUsage-linux-amd64-v#{version}" => "KubeNodeUsage"
+    elsif OS.linux? && Hardware::CPU.arm?
+      bin.install "KubeNodeUsage-linux-arm64-v#{version}" => "KubeNodeUsage"
     end
   end
+
+  test do
+    system "#{bin}/KubeNodeUsage", "--version"
+  end
+end
 EOF
 
 # Clean up the temporary file
