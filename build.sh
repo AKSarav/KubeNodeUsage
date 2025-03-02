@@ -59,7 +59,7 @@ sed -i '' "s/var semver = \"v[0-9]*\.[0-9]*\.[0-9]*\"/var semver = \"v$Version\"
 
 # Create the Homebrew formula
 cat <<EOF > kubenodeusage.rb
-class KubeNodeUsage < Formula
+class Kubenodeusage < Formula
     desc "KubeNodeUsage is a command line utility to get the usage of the nodes and pods in a Kubernetes cluster graphically."
     homepage "https://github.com/AKSarav/KubeNodeUsage"
     version "$Version"
