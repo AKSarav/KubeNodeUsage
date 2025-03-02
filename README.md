@@ -133,13 +133,28 @@ KubeNodeUsage Source code is Public, Feel free to download and validate it yours
 
 You can clone this project and run it as shown below
 
+#### Brew Installation 🍺
+
+```
+brew tap AKSarav/kubenodeusage
+brew install kubenodeusage
+```
+
+#### With GO install command  🚀
+
+```
+go install github.com/AKSarav/Kube-Node-Usage@latest
+```
+
+#### Clone and Run 👨‍💻
+
 ```
 git clone https://github.com/AKSarav/Kube-Node-Usage.git
 cd Kube-Node-Usage
 go run main.go
 ```
 
-Or Download the Binaries from the Github release page
+#### Download the Binaries from the Release Page 📦
 
 Goto the https://github.com/AKSarav/Kube-Node-Usage/releases and download the suitable binary for your OS and use it
 
