@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"kubenodeusage/cmd/nodemodel"
+	"kubenodeusage/cmd/podmodel"
 	"kubenodeusage/k8s"
 	"kubenodeusage/utils"
 	"os"
@@ -57,10 +58,9 @@ func PrintArgs(args utils.Inputs) {
 
 }
 
-
 func checkinputs(args *utils.Inputs) {
 
-	IsAllFiltersOn(args)	
+	IsAllFiltersOn(args)
 
 	if args.FilterColor != "" {
 		if !utils.IsValidColor(args.FilterColor) {
@@ -76,7 +76,6 @@ func checkinputs(args *utils.Inputs) {
 		}
 	}
 
-
 	if args.SortBy != "" {
 		if !utils.IsValidSort(args.SortBy) {
 			fmt.Println("Not a valid Sort by option please choose one of", utils.PrintValidSorts())
@@ -86,15 +85,13 @@ func checkinputs(args *utils.Inputs) {
 
 }
 
-
-
 func IsAllFiltersOn(args *utils.Inputs) {
 
 	var tempList []string
 	tempList = append(tempList, args.FilterLabel, args.FilterNodes, args.FilterColor)
 	filtersIntegrityValue := 0
 	for _, filter := range tempList {
-		if filter != ""{
+		if filter != "" {
 			filtersIntegrityValue++
 		}
 	}
@@ -113,18 +110,18 @@ func main() {
 	// clearScreen()
 	// parse command line arguments
 	var (
-		helpFlag     bool
-		reverseFlag  bool
-		debug        bool
-		sortby       string
-		filternodes  string
-		filtercolor  string
+		helpFlag    bool
+		reverseFlag bool
+		debug       bool
+		sortby      string
+		filternodes string
+		filtercolor string
 		filterlabel string
-		metrics      string
-		label string
-		lblAlias string
-		noinfo bool
-		pods bool
+		metrics     string
+		label       string
+		lblAlias    string
+		noinfo      bool
+		pods        bool
 	)
 
 	flag.BoolVar(&helpFlag, "help", false, "to display help")
@@ -150,8 +147,7 @@ func main() {
 		utils.Logger.SetLevel(logrus.DebugLevel)
 	}
 
-
-	if (label != ""){
+	if label != "" {
 		if strings.Contains(label, "#") {
 			lblAlias = strings.Split(label, "#")[1]
 			label = strings.Split(label, "#")[0]
@@ -162,18 +158,18 @@ func main() {
 	}
 
 	args := utils.Inputs{
-		HelpFlag:     helpFlag,
-		ReverseFlag:  reverseFlag,
-		Debug:        debug,
-		SortBy:       sortby,
-		FilterNodes:  filternodes,
-		FilterColor:  filtercolor,
-		FilterLabel: filterlabel,
-		Metrics:      metrics,
+		HelpFlag:       helpFlag,
+		ReverseFlag:    reverseFlag,
+		Debug:          debug,
+		SortBy:         sortby,
+		FilterNodes:    filternodes,
+		FilterColor:    filtercolor,
+		FilterLabel:    filterlabel,
+		Metrics:        metrics,
 		LabelToDisplay: label,
-		LabelAlias: lblAlias,
-		NoInfo: noinfo,
-		Pods: pods,
+		LabelAlias:     lblAlias,
+		NoInfo:         noinfo,
+		Pods:           pods,
 	}
 
 	checkinputs(&args) // sending the args using Address of Operator
@@ -183,24 +179,23 @@ func main() {
 	}
 
 	if pods {
-		fmt.Println("Yet to implement")
 		// KubePodUsage - For Pods
-		// args.Pods = true
-		// mdl := podusage{}
-		// mdl.args = &args
-		// mdl.clusterinfo = k8s.ClusterInfo()
-		// mdl.podstats = k8s.Pods(&args)
-		// if _, err := tea.NewProgram(mdl).Run(); err != nil {
-		// 	fmt.Println("Oh no!", err)
-		// 	os.Exit(1)
-		// }
-	} else{
+		args.Pods = true
+		mdl := podmodel.PodUsage{}
+		mdl.Args = &args
+		mdl.ClusterInfo = k8s.ClusterInfo()
+		mdl.Podstats = k8s.Pods(&args)
+		if _, err := tea.NewProgram(mdl).Run(); err != nil {
+			fmt.Println("Oh no!", err)
+			os.Exit(1)
+		}
+	} else {
 		// KubeNodeUsage - For Nodes
 		mdl := nodemodel.NodeUsage{}
 		mdl.Args = &args
 		mdl.ClusterInfo = k8s.ClusterInfo()
 		mdl.Nodestats = k8s.Nodes(&args)
-		
+
 		if _, err := tea.NewProgram(mdl).Run(); err != nil {
 			fmt.Println("Oh no!", err)
 			os.Exit(1)
