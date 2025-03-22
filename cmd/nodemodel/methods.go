@@ -2,24 +2,27 @@ package nodemodel
 
 import (
 	"fmt"
-	"kubenodeusage/k8s"
-	"kubenodeusage/utils"
 	"os"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/AKSarav/KubeNodeUsage/v3/k8s"
+	"github.com/AKSarav/KubeNodeUsage/v3/utils"
+
 	"github.com/iancoleman/strcase"
 )
 
-
 func getUnit(metricType string) string {
 	unit := ""
-	switch metricType{
-		case "memory": unit = "MB"
-		case "cpu": unit = "Cores"
-		case "disk": unit = "GB"
+	switch metricType {
+	case "memory":
+		unit = "MB"
+	case "cpu":
+		unit = "Cores"
+	case "disk":
+		unit = "GB"
 	}
 	return unit
 }
@@ -210,26 +213,27 @@ func FilterForColor(m NodeUsage) []k8s.Node {
 
 func headlinePrinter(m *NodeUsage, output *strings.Builder, Nodes *[]k8s.Node, maxNameWidth *int) {
 
-	
 	unit := getUnit(m.Args.Metrics)
-	freeHeading := "Free(" + unit+")"
-	maxHeading := "Max(" + unit+")"
+	freeHeading := "Free(" + unit + ")"
+	maxHeading := "Max(" + unit + ")"
+	uptimeHeading := "Uptime"
+	statusHeading := "Status"
 
-	values := []interface{}{"Name", freeHeading, maxHeading, "Pods"}
+	values := []interface{}{"Name", freeHeading, maxHeading, "Pods", uptimeHeading, statusHeading}
 	if m.Args.LabelToDisplay != "" {
-		m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-10s %-10s %-5s %-12s %s\n"
+		m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-10s %-10s %-5s %-8s %-10s %s\n"
 		values = append(values, m.Args.LabelAlias, "Usage%")
-		*maxNameWidth = *maxNameWidth+12
+		*maxNameWidth = *maxNameWidth + 12
 	} else {
-		m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-10s %-10s %-5s %s\n"
+		m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-10s %-10s %-5s %-8s %-10s %s\n"
 		values = append(values, "Usage%")
 	}
-	fmt.Fprintf(output, m.Format, values...)	
-	
+	fmt.Fprintf(output, m.Format, values...)
+
 }
 
 func PrintDesign(output *strings.Builder, maxNameWidth int) {
-	lines := strings.Repeat("-", maxNameWidth+12+12+20)
+	lines := strings.Repeat("-", maxNameWidth+73)
 	fmt.Fprint(output, lines)
 	fmt.Fprint(output, "\n")
 }
@@ -250,21 +254,21 @@ func MetricsHandler(m NodeUsage, output *strings.Builder) {
 		}
 	}
 	// Header and Version info
-	
-	fmt.Fprint(output, "\n# KubeNodeUsage\n# Version: 3.0.2\n# https://github.com/AKSarav/Kube-Node-Usage\n\n")
+
+	fmt.Fprint(output, "\n# KubeNodeUsage\n# Version: 3.0.2\n# https://github.com/AKSarav/KubeNodeUsage\n\n")
 
 	if !m.Args.NoInfo {
-		fmt.Fprint(output, "\n# Context: ",m.ClusterInfo.Context,"\n# Version: ",m.ClusterInfo.Version,"\n# URL: ",m.ClusterInfo.URL,"\n\n")
+		fmt.Fprint(output, "\n# Context: ", m.ClusterInfo.Context, "\n# Version: ", m.ClusterInfo.Version, "\n# URL: ", m.ClusterInfo.URL, "\n\n")
 	}
 
-	fmt.Fprint(output, "# ", strcase.ToCamel(m.Args.Metrics)," Metrics\n\n")
-	headlinePrinter(&m ,output, &filteredNodes, &maxNameWidth)
+	fmt.Fprint(output, "# ", strcase.ToCamel(m.Args.Metrics), " Metrics\n\n")
+	headlinePrinter(&m, output, &filteredNodes, &maxNameWidth)
 	PrintDesign(output, maxNameWidth)
 
 	if m.Args.Metrics == "memory" {
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_memory_percent) / 100.0)
-			values := []interface{}{node.Name, strconv.Itoa(node.Free_memory/1024), strconv.Itoa(node.Capacity_memory/1024), node.TotalPods}
+			values := []interface{}{node.Name, strconv.Itoa(node.Free_memory / 1024), strconv.Itoa(node.Capacity_memory / 1024), node.TotalPods, node.Uptime, node.Status}
 			if m.Args.LabelToDisplay != "" {
 				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
 			} else {
@@ -275,7 +279,7 @@ func MetricsHandler(m NodeUsage, output *strings.Builder) {
 	} else if m.Args.Metrics == "cpu" {
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_cpu_percent) / 100.0)
-			values := []interface{}{node.Name, strconv.Itoa(int(node.Free_cpu)), strconv.Itoa(node.Capacity_cpu), node.TotalPods}
+			values := []interface{}{node.Name, strconv.Itoa(int(node.Free_cpu)), strconv.Itoa(node.Capacity_cpu), node.TotalPods, node.Uptime, node.Status}
 			if m.Args.LabelToDisplay != "" {
 				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
 			} else {
@@ -286,7 +290,7 @@ func MetricsHandler(m NodeUsage, output *strings.Builder) {
 	} else if m.Args.Metrics == "disk" {
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_disk_percent) / 100.0)
-			values := []interface{}{node.Name, strconv.Itoa(node.Free_disk/1024/1024), strconv.Itoa(node.Capacity_disk/1024/1024), node.TotalPods}
+			values := []interface{}{node.Name, strconv.Itoa(node.Free_disk / 1024 / 1024), strconv.Itoa(node.Capacity_disk / 1024 / 1024), node.TotalPods, node.Uptime, node.Status}
 			if m.Args.LabelToDisplay != "" {
 				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
 			} else {

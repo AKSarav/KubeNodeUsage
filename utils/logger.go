@@ -1,13 +1,19 @@
 package utils
 
 import (
-	"github.com/sirupsen/logrus"
 	"os"
+
+	"github.com/sirupsen/logrus"
 )
 
 var Logger *logrus.Logger
 
 func InitLogger() {
+	// If logger is already initialized, don't initialize again
+	if Logger != nil {
+		return
+	}
+
 	// Create and configure the logger
 	logger := logrus.New()
 
@@ -21,8 +27,8 @@ func InitLogger() {
 	// Parse the log level from the environment variable
 	level, err := logrus.ParseLevel(logLevel)
 	if err != nil {
-		// Handle the error if the log level is invalid
-		panic("Invalid LOG_LEVEL environment variable value")
+		// Handle the error if the log level is invalid by using info level instead of panicking
+		level = logrus.InfoLevel
 	}
 
 	// Set the log level

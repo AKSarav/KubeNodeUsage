@@ -2,10 +2,11 @@ package podmodel
 
 import (
 	"fmt"
-	"kubenodeusage/k8s"
-	"kubenodeusage/utils"
 	"strings"
 	"time"
+
+	"github.com/AKSarav/KubeNodeUsage/v3/k8s"
+	"github.com/AKSarav/KubeNodeUsage/v3/utils"
 
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -46,12 +47,33 @@ func NewPodUsage(args *utils.Inputs) PodUsage {
 	ti.CharLimit = 156
 	ti.Width = 20
 
-	return PodUsage{
+	model := PodUsage{
 		Args:        args,
 		searchInput: ti,
 		ClusterInfo: k8s.ClusterInfo(),
 		Podstats:    k8s.Pods(args),
+		content:     "",
+		xOffset:     0,
+		width:       0,
+		height:      0,
+		ready:       false,
+		maxWidth:    0,
+		searching:   false,
 	}
+
+	// Initialize content
+	var output strings.Builder
+	MetricsHandler(model, &output)
+	model.content = output.String()
+
+	// Calculate initial maxWidth
+	for _, line := range strings.Split(model.content, "\n") {
+		if len(line) > model.maxWidth {
+			model.maxWidth = len(line)
+		}
+	}
+
+	return model
 }
 
 // Init Bubble Tea podusage

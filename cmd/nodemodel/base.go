@@ -2,60 +2,173 @@ package nodemodel
 
 import (
 	"fmt"
-	"kubenodeusage/k8s"
-	"kubenodeusage/utils"
 	"strings"
 	"time"
 
+	"github.com/AKSarav/KubeNodeUsage/v3/k8s"
+	"github.com/AKSarav/KubeNodeUsage/v3/utils"
+
 	"github.com/charmbracelet/bubbles/progress"
+	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-var helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")).Render
+var (
+	helpStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")).Render
+	searchStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")).Bold(true)
+	highlightStyle = lipgloss.NewStyle().Background(lipgloss.Color("#ab2770"))
+)
 
 type tickMsg time.Time
 
 // nodeusage is the Bubble Tea model.
 type NodeUsage struct {
 	ClusterInfo k8s.Cluster
-	Nodestats []k8s.Node
-	Args      *utils.Inputs
-	Format	string
+	Nodestats   []k8s.Node
+	Args        *utils.Inputs
+	Format      string
+	viewport    viewport.Model
+	content     string
+	xOffset     int // Track horizontal scroll position
+	width       int // Terminal width
+	height      int // Terminal height
+	ready       bool
+	maxWidth    int // Maximum content width
+	searchInput textinput.Model
+	searching   bool
+}
+
+// NewNodeUsage creates a new NodeUsage model
+func NewNodeUsage(args *utils.Inputs) NodeUsage {
+	ti := textinput.New()
+	ti.Placeholder = "Search..."
+	ti.CharLimit = 156
+	ti.Width = 20
+
+	model := NodeUsage{
+		Args:        args,
+		searchInput: ti,
+		ClusterInfo: k8s.ClusterInfo(),
+		Nodestats:   k8s.Nodes(args),
+		Format:      "table",
+		content:     "",
+		xOffset:     0,
+		width:       0,
+		height:      0,
+		ready:       false,
+		maxWidth:    0,
+		searching:   false,
+	}
+
+	// Initialize content
+	var output strings.Builder
+	MetricsHandler(model, &output)
+	model.content = output.String()
+
+	// Calculate initial maxWidth
+	for _, line := range strings.Split(model.content, "\n") {
+		if len(line) > model.maxWidth {
+			model.maxWidth = len(line)
+		}
+	}
+
+	return model
 }
 
 // Init Bubble Tea nodeusage
 func (m NodeUsage) Init() tea.Cmd {
-	return tickCmd()
+	return tea.Batch(tickCmd(), tea.EnterAltScreen)
 }
 
 // Update method for Bubble Tea - for constant update loop
 func (m NodeUsage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var (
+		cmd  tea.Cmd
+		cmds []tea.Cmd
+	)
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if msg.Type == tea.KeyCtrlC {
-			fmt.Println("Ctrl+C pressed")
+		switch {
+		case msg.Type == tea.KeyCtrlC:
 			return m, tea.Quit
-		}
-		//  check if Q or q is pressed
-		if msg.Type == tea.KeyRunes && (msg.Runes[0] == 'Q' || msg.Runes[0] == 'q') {
-			fmt.Println("Q or q pressed")
+		case msg.Type == tea.KeyEsc && m.searching:
+			// Exit search mode
+			m.searching = false
+			m.searchInput.Reset()
+			m.searchInput.Blur()
+		case msg.Type == tea.KeyRunes && (msg.Runes[0] == 'Q' || msg.Runes[0] == 'q') && !m.searching:
 			return m, tea.Quit
+		case msg.Type == tea.KeyRunes && (msg.Runes[0] == 'S' || msg.Runes[0] == 's') && !m.searching:
+			// Enter search mode
+			m.searching = true
+			m.searchInput.Focus()
+			return m, nil
 		}
 
-		// // check if R or R is pressed
-		// if msg.Type == tea.KeyRunes && (msg.Runes[0] == 'R' || msg.Runes[0] == 'r') {
-		// 	fmt.Println("R or r pressed")
-		// 	m.nodestats = k8s.Nodes(m.args.Metrics)
-		// 	return m, tea.ClearScreen
-		// }
+		if m.searching {
+			m.searchInput, cmd = m.searchInput.Update(msg)
+			cmds = append(cmds, cmd)
+			return m, tea.Batch(cmds...)
+		}
+
+		// Handle horizontal scrolling only when not searching
+		switch msg.String() {
+		case "left":
+			if m.xOffset > 0 {
+				m.xOffset -= 5
+			}
+		case "right":
+			maxScroll := m.maxWidth - m.width
+			if maxScroll > 0 && m.xOffset < maxScroll {
+				m.xOffset = min(m.xOffset+5, maxScroll)
+			}
+		}
+	case tea.WindowSizeMsg:
+		if !m.ready {
+			m.viewport = viewport.New(msg.Width, msg.Height-1)
+			m.ready = true
+		}
+		m.width = msg.Width
+		m.height = msg.Height
+		m.viewport.Width = msg.Width
+		m.viewport.Height = msg.Height - 1
+
+		// Re-render content with new size
+		var output strings.Builder
+		MetricsHandler(m, &output)
+		m.content = output.String()
+
+		// Recalculate maxWidth
+		m.maxWidth = 0
+		for _, line := range strings.Split(m.content, "\n") {
+			if len(line) > m.maxWidth {
+				m.maxWidth = len(line)
+			}
+		}
 	case tickMsg:
 		m.ClusterInfo = k8s.ClusterInfo()
 		m.Nodestats = k8s.Nodes(m.Args)
-		return m, tea.Batch(tickCmd())
-	}
-	return m, nil
+		var output strings.Builder
+		MetricsHandler(m, &output)
+		m.content = output.String()
 
+		m.maxWidth = 0
+		for _, line := range strings.Split(m.content, "\n") {
+			if len(line) > m.maxWidth {
+				m.maxWidth = len(line)
+			}
+		}
+
+		m.viewport.SetContent(m.content)
+		cmds = append(cmds, tickCmd())
+	}
+
+	m.viewport, cmd = m.viewport.Update(msg)
+	cmds = append(cmds, cmd)
+	return m, tea.Batch(cmds...)
 }
 
 func GetBar(decider float64) progress.Model {
@@ -76,17 +189,39 @@ func GetBar(decider float64) progress.Model {
 
 // View renders bubble tea
 func (m NodeUsage) View() string {
+	if !m.ready {
+		return "Initializing..."
+	}
 
-	var output strings.Builder
+	// Apply horizontal scrolling and search highlighting
+	lines := strings.Split(m.content, "\n")
+	var scrolledLines []string
 
-	DebugView(m, &output) // If debug on this would print Node and arg details
+	searchTerm := strings.ToLower(m.searchInput.Value())
+	for _, line := range lines {
+		if len(line) > m.xOffset {
+			displayLine := line[m.xOffset:]
+			// If searching and line contains search term, highlight it
+			if m.searching && searchTerm != "" && strings.Contains(strings.ToLower(displayLine), searchTerm) {
+				displayLine = highlightStyle.Render(displayLine)
+			}
+			scrolledLines = append(scrolledLines, displayLine)
+		} else {
+			scrolledLines = append(scrolledLines, "")
+		}
+	}
 
-	MetricsHandler(m, &output)
+	viewportContent := strings.Join(scrolledLines, "\n")
+	m.viewport.SetContent(viewportContent)
 
-	output.WriteString("\n" + helpStyle("Press Q or Ctrl+C to quit"))
+	var helpText string
+	if m.searching {
+		helpText = fmt.Sprintf("\n%s %s (ESC to exit search)", searchStyle.Render("Search:"), m.searchInput.View())
+	} else {
+		helpText = helpStyle("\nUse ← and → to scroll horizontally, S to search, Q or Ctrl+C to quit")
+	}
 
-	return output.String()
-
+	return fmt.Sprintf("%s%s", m.viewport.View(), helpText)
 }
 
 // tickCmd returns a command that sends a tick every second.
@@ -94,4 +229,12 @@ func tickCmd() tea.Cmd {
 	return tea.Tick(time.Second*1, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
+}
+
+// Helper function to get minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

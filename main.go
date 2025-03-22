@@ -3,22 +3,21 @@ package main
 import (
 	"flag"
 	"fmt"
-	"kubenodeusage/cmd/nodemodel"
-	"kubenodeusage/cmd/podmodel"
-	"kubenodeusage/k8s"
-	"kubenodeusage/utils"
 	"os"
 	"reflect"
 	"strings"
 
+	"github.com/AKSarav/KubeNodeUsage/v3/cmd/nodemodel"
+	"github.com/AKSarav/KubeNodeUsage/v3/cmd/podmodel"
+	"github.com/AKSarav/KubeNodeUsage/v3/utils"
+
+	"github.com/iancoleman/strcase"
 	"github.com/sirupsen/logrus"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// map of keys of string type and values of interface type
-// Keys are strings.
-// Values can be of any type.
+var semver = "v3.0.3"
 
 /*
 Function: usage
@@ -39,10 +38,11 @@ func usage() {
 	fmt.Printf(displayfmt, "  --metrics", utils.PrintValidMetrics())
 	fmt.Printf(displayfmt, "  --label", "choose which label to display - syntax is labelname#alias here alias represents the column name to show in the output")
 	fmt.Printf(displayfmt, "  --noinfo", "disable printing of cluster info")
+	fmt.Printf(displayfmt, "  --pods", "show pod usage instead of node usage")
 	os.Exit(1)
 }
 
-// PrintArgs is used for Printing an arguments/*
+// PrintArgs is used for Printing an arguments
 func PrintArgs(args utils.Inputs) {
 	// print key value pairs
 	t := reflect.TypeOf(args)
@@ -55,146 +55,96 @@ func PrintArgs(args utils.Inputs) {
 			fmt.Printf("%s: %v\n", field.Name, value)
 		}
 	}
-
 }
 
 func checkinputs(args *utils.Inputs) {
+	// Check if help is requested
+	if args.Help {
+		usage()
+	}
 
+	// Check if metrics is valid
+	if !utils.IsValidMetric(args.Metrics) {
+		utils.Logger.Error("Invalid metric: ", args.Metrics)
+		usage()
+	}
+
+	// Check if sortby is valid
+	if args.SortBy != "" && !utils.IsValidSort(args.SortBy) {
+		utils.Logger.Error("Invalid sort: ", args.SortBy)
+		usage()
+	}
+
+	// Check if filtercolor is valid
+	if args.FilterColor != "" && !utils.IsValidColor(args.FilterColor) {
+		utils.Logger.Error("Invalid color: ", args.FilterColor)
+		usage()
+	}
+
+	// Check if all filters are on
 	IsAllFiltersOn(args)
 
-	if args.FilterColor != "" {
-		if !utils.IsValidColor(args.FilterColor) {
-			fmt.Println("Not a valid color please choose one of the following colors", utils.PrintValidColors())
-			os.Exit(2)
-		}
+	// Set log level
+	if args.Debug {
+		utils.Logger.SetLevel(logrus.DebugLevel)
 	}
 
-	if args.Metrics != "" {
-		if !utils.IsValidMetric(args.Metrics) {
-			fmt.Println("Not a valid Metric please choose one of", utils.PrintValidMetrics())
-			os.Exit(2)
+	// Set label alias if not set
+	if args.LabelToDisplay != "" {
+		if !strings.Contains(args.LabelToDisplay, "#") {
+			args.LabelAlias = strcase.ToCamel(args.LabelToDisplay)
+		} else {
+			args.LabelAlias = strings.Split(args.LabelToDisplay, "#")[1]
+			args.LabelToDisplay = strings.Split(args.LabelToDisplay, "#")[0]
 		}
 	}
-
-	if args.SortBy != "" {
-		if !utils.IsValidSort(args.SortBy) {
-			fmt.Println("Not a valid Sort by option please choose one of", utils.PrintValidSorts())
-			os.Exit(2)
-		}
-	}
-
 }
 
 func IsAllFiltersOn(args *utils.Inputs) {
-
-	var tempList []string
-	tempList = append(tempList, args.FilterLabel, args.FilterNodes, args.FilterColor)
-	filtersIntegrityValue := 0
-	for _, filter := range tempList {
-		if filter != "" {
-			filtersIntegrityValue++
-		}
-	}
-	if filtersIntegrityValue > 1 {
-		fmt.Println("Only one filter can be used at a time")
+	if args.FilterLabel != "" && args.FilterNodes != "" && args.FilterColor != "" {
+		utils.Logger.Error("Only one filter can be used at a time")
 		os.Exit(2)
 	}
 }
 
-/*
-Function: main
-Description: main function
-*/
 func main() {
+	var args utils.Inputs
 
-	// clearScreen()
-	// parse command line arguments
-	var (
-		helpFlag    bool
-		reverseFlag bool
-		debug       bool
-		sortby      string
-		filternodes string
-		filtercolor string
-		filterlabel string
-		metrics     string
-		label       string
-		lblAlias    string
-		noinfo      bool
-		pods        bool
-	)
+	// Initialize logger
+	utils.InitLogger()
 
-	flag.BoolVar(&helpFlag, "help", false, "to display help")
-	flag.BoolVar(&reverseFlag, "desc", false, "to display sort in descending order")
-	flag.BoolVar(&debug, "debug", false, "enable debug mode")
-	flag.StringVar(&sortby, "sortby", "name", "sort by name, free, capacity, usage")
-	flag.StringVar(&filternodes, "filternodes", "", "filter nodes based on name")
-	flag.StringVar(&filtercolor, "filtercolor", "", "filter nodes based on color")
-	flag.StringVar(&filterlabel, "filterlabel", "", "filter nodes based on labels")
-	flag.StringVar(&metrics, "metrics", "memory", "choose which metrics to display (memory, cpu, disk)")
-	flag.StringVar(&label, "label", "", "choose which label to display")
-	flag.BoolVar(&noinfo, "noinfo", false, "disable printing of cluster info")
-	flag.BoolVar(&pods, "pods", false, "enable pod details")
-
+	// Flags
+	flag.StringVar(&args.Metrics, "metrics", "memory", "Metrics to display")
+	flag.StringVar(&args.SortBy, "sortby", "", "Sort by field")
+	flag.StringVar(&args.FilterNodes, "filternodes", "", "Filter nodes")
+	flag.StringVar(&args.FilterColor, "filtercolor", "", "Filter by color")
+	flag.StringVar(&args.FilterLabel, "filterlabel", "", "Filter by label")
+	flag.StringVar(&args.LabelToDisplay, "label", "", "Label to display")
+	flag.BoolVar(&args.ReverseFlag, "desc", false, "Reverse sort")
+	flag.BoolVar(&args.Debug, "debug", false, "Debug mode")
+	flag.BoolVar(&args.NoInfo, "noinfo", false, "No info")
+	flag.BoolVar(&args.Pods, "pods", false, "Show pods")
+	flag.BoolVar(&args.Help, "help", false, "Help")
 	flag.Parse()
 
-	if helpFlag {
-		usage()
-	}
+	// Check inputs
+	checkinputs(&args)
 
-	if debug {
-		utils.InitLogger()
-		utils.Logger.SetLevel(logrus.DebugLevel)
-	}
+	// Print args if debug is enabled
+	PrintArgs(args)
 
-	if label != "" {
-		if strings.Contains(label, "#") {
-			lblAlias = strings.Split(label, "#")[1]
-			label = strings.Split(label, "#")[0]
-		} else {
-			lblAlias = "label"
-			label = strings.Split(label, "#")[0]
-		}
-	}
-
-	args := utils.Inputs{
-		HelpFlag:       helpFlag,
-		ReverseFlag:    reverseFlag,
-		Debug:          debug,
-		SortBy:         sortby,
-		FilterNodes:    filternodes,
-		FilterColor:    filtercolor,
-		FilterLabel:    filterlabel,
-		Metrics:        metrics,
-		LabelToDisplay: label,
-		LabelAlias:     lblAlias,
-		NoInfo:         noinfo,
-		Pods:           pods,
-	}
-
-	checkinputs(&args) // sending the args using Address of Operator
-
-	if debug {
-		PrintArgs(args)
-	}
-
-	if pods {
-		// KubePodUsage - For Pods
-		args.Pods = true
-		mdl := podmodel.NewPodUsage(&args)
-		if _, err := tea.NewProgram(mdl).Run(); err != nil {
-			fmt.Println("Oh no!", err)
-			os.Exit(1)
-		}
+	// Initialize the appropriate model based on the --pods flag
+	var mdl tea.Model
+	if args.Pods {
+		mdl = podmodel.NewPodUsage(&args)
 	} else {
-		// KubeNodeUsage - For Nodes
-		mdl := nodemodel.NodeUsage{}
-		mdl.Args = &args
-		mdl.ClusterInfo = k8s.ClusterInfo()
-		mdl.Nodestats = k8s.Nodes(&args)
-		if _, err := tea.NewProgram(mdl).Run(); err != nil {
-			fmt.Println("Oh no!", err)
-			os.Exit(1)
-		}
+		mdl = nodemodel.NewNodeUsage(&args)
+	}
+
+	// Run the program
+	p := tea.NewProgram(mdl)
+	if err := p.Start(); err != nil {
+		fmt.Printf("Error: %v", err)
+		os.Exit(1)
 	}
 }

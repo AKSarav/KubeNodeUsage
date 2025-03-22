@@ -2,13 +2,14 @@ package podmodel
 
 import (
 	"fmt"
-	"kubenodeusage/k8s"
-	"kubenodeusage/utils"
 	"os"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/AKSarav/KubeNodeUsage/v3/k8s"
+	"github.com/AKSarav/KubeNodeUsage/v3/utils"
 
 	"github.com/iancoleman/strcase"
 )
