@@ -181,10 +181,7 @@ func main() {
 	if pods {
 		// KubePodUsage - For Pods
 		args.Pods = true
-		mdl := podmodel.PodUsage{}
-		mdl.Args = &args
-		mdl.ClusterInfo = k8s.ClusterInfo()
-		mdl.Podstats = k8s.Pods(&args)
+		mdl := podmodel.NewPodUsage(&args)
 		if _, err := tea.NewProgram(mdl).Run(); err != nil {
 			fmt.Println("Oh no!", err)
 			os.Exit(1)
@@ -195,7 +192,6 @@ func main() {
 		mdl.Args = &args
 		mdl.ClusterInfo = k8s.ClusterInfo()
 		mdl.Nodestats = k8s.Nodes(&args)
-
 		if _, err := tea.NewProgram(mdl).Run(); err != nil {
 			fmt.Println("Oh no!", err)
 			os.Exit(1)

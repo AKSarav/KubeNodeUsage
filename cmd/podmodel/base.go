@@ -8,12 +8,17 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/progress"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-var helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")).Render
+var (
+	helpStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")).Render
+	searchStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")).Bold(true)
+	highlightStyle = lipgloss.NewStyle().Background(lipgloss.Color("#ab2770"))
+)
 
 type tickMsg time.Time
 
@@ -26,17 +31,32 @@ type PodUsage struct {
 	viewport    viewport.Model
 	content     string
 	xOffset     int // Track horizontal scroll position
+	width       int // Terminal width
+	height      int // Terminal height
+	ready       bool
+	maxWidth    int // Maximum content width
+	searchInput textinput.Model
+	searching   bool
+}
+
+// NewPodUsage creates a new PodUsage model
+func NewPodUsage(args *utils.Inputs) PodUsage {
+	ti := textinput.New()
+	ti.Placeholder = "Search..."
+	ti.CharLimit = 156
+	ti.Width = 20
+
+	return PodUsage{
+		Args:        args,
+		searchInput: ti,
+		ClusterInfo: k8s.ClusterInfo(),
+		Podstats:    k8s.Pods(args),
+	}
 }
 
 // Init Bubble Tea podusage
 func (m PodUsage) Init() tea.Cmd {
-	vp := viewport.New(0, 0)
-	vp.Style = lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("62"))
-	m.viewport = vp
-	m.xOffset = 0
-	return tickCmd()
+	return tea.Batch(tickCmd(), tea.EnterAltScreen)
 }
 
 func tickCmd() tea.Cmd {
@@ -54,32 +74,64 @@ func (m PodUsage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if msg.Type == tea.KeyCtrlC {
-			fmt.Println("Ctrl+C pressed")
+		switch {
+		case msg.Type == tea.KeyCtrlC:
 			return m, tea.Quit
-		}
-		if msg.Type == tea.KeyRunes && (msg.Runes[0] == 'Q' || msg.Runes[0] == 'q') {
-			fmt.Println("Q or q pressed")
+		case msg.Type == tea.KeyEsc && m.searching:
+			// Exit search mode
+			m.searching = false
+			m.searchInput.Reset()
+			m.searchInput.Blur()
+		case msg.Type == tea.KeyRunes && (msg.Runes[0] == 'Q' || msg.Runes[0] == 'q') && !m.searching:
 			return m, tea.Quit
+		case msg.Type == tea.KeyRunes && (msg.Runes[0] == 'S' || msg.Runes[0] == 's') && !m.searching:
+			// Enter search mode
+			m.searching = true
+			m.searchInput.Focus()
+			return m, nil
 		}
-		// Add horizontal scrolling with arrow keys
+
+		if m.searching {
+			m.searchInput, cmd = m.searchInput.Update(msg)
+			cmds = append(cmds, cmd)
+			return m, tea.Batch(cmds...)
+		}
+
+		// Handle horizontal scrolling only when not searching
 		switch msg.String() {
 		case "left":
 			if m.xOffset > 0 {
 				m.xOffset -= 5
 			}
 		case "right":
-			m.xOffset += 5
+			maxScroll := m.maxWidth - m.width
+			if maxScroll > 0 && m.xOffset < maxScroll {
+				m.xOffset = min(m.xOffset+5, maxScroll)
+			}
 		}
 	case tea.WindowSizeMsg:
+		if !m.ready {
+			m.viewport = viewport.New(msg.Width, msg.Height-1)
+			m.ready = true
+		}
+		m.width = msg.Width
+		m.height = msg.Height
 		m.viewport.Width = msg.Width
-		m.viewport.Height = msg.Height
+		m.viewport.Height = msg.Height - 1
 	case tickMsg:
 		m.ClusterInfo = k8s.ClusterInfo()
 		m.Podstats = k8s.Pods(m.Args)
 		var output strings.Builder
 		MetricsHandler(m, &output)
 		m.content = output.String()
+
+		m.maxWidth = 0
+		for _, line := range strings.Split(m.content, "\n") {
+			if len(line) > m.maxWidth {
+				m.maxWidth = len(line)
+			}
+		}
+
 		m.viewport.SetContent(m.content)
 		cmds = append(cmds, tickCmd())
 	}
@@ -87,6 +139,14 @@ func (m PodUsage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.viewport, cmd = m.viewport.Update(msg)
 	cmds = append(cmds, cmd)
 	return m, tea.Batch(cmds...)
+}
+
+// Helper function to get minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func GetBar(decider float64) progress.Model {
@@ -106,17 +166,37 @@ func GetBar(decider float64) progress.Model {
 
 // View renders bubble tea
 func (m PodUsage) View() string {
-	// Apply horizontal scrolling by splitting content into lines and shifting each line
-	lines := strings.Split(m.viewport.View(), "\n")
+	if !m.ready {
+		return "Initializing..."
+	}
+
+	// Apply horizontal scrolling and search highlighting
+	lines := strings.Split(m.content, "\n")
 	var scrolledLines []string
 
+	searchTerm := strings.ToLower(m.searchInput.Value())
 	for _, line := range lines {
 		if len(line) > m.xOffset {
-			scrolledLines = append(scrolledLines, line[m.xOffset:])
+			displayLine := line[m.xOffset:]
+			// If searching and line contains search term, highlight it
+			if m.searching && searchTerm != "" && strings.Contains(strings.ToLower(displayLine), searchTerm) {
+				displayLine = highlightStyle.Render(displayLine)
+			}
+			scrolledLines = append(scrolledLines, displayLine)
 		} else {
 			scrolledLines = append(scrolledLines, "")
 		}
 	}
 
-	return strings.Join(scrolledLines, "\n") + "\n" + helpStyle("Use ← and → to scroll horizontally, Q or Ctrl+C to quit")
+	viewportContent := strings.Join(scrolledLines, "\n")
+	m.viewport.SetContent(viewportContent)
+
+	var helpText string
+	if m.searching {
+		helpText = fmt.Sprintf("\n%s %s (ESC to exit search)", searchStyle.Render("Search:"), m.searchInput.View())
+	} else {
+		helpText = helpStyle("\nUse ← and → to scroll horizontally, S to search, Q or Ctrl+C to quit")
+	}
+
+	return fmt.Sprintf("%s%s", m.viewport.View(), helpText)
 }
