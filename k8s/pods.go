@@ -28,6 +28,8 @@ type Pod struct {
 	Limit_cpu            float32
 	Usage_memory_percent float32
 	Usage_cpu_percent    float32
+	Usage_disk           int64   // Total disk usage in bytes
+	Usage_disk_percent   float32 // Disk usage percentage
 	Status               string
 	LabelToDisplay       string
 	Labels               map[string]string
@@ -176,6 +178,31 @@ func Pods(inputs *utils.Inputs) (PodStatsList []Pod) {
 						podstats.Usage_cpu_percent = (podstats.Usage_cpu / podstats.Limit_cpu) * 100
 					} else if podstats.Capacity_cpu > 0 {
 						podstats.Usage_cpu_percent = (podstats.Usage_cpu / float32(podstats.Capacity_cpu/1000)) * 100
+					}
+
+				case "disk":
+					// Calculate total disk usage
+					var totalDiskUsage int64 = 0
+
+					for _, container := range pm.Containers {
+						// Get filesystem stats if available
+						if stats := container.Usage.StorageEphemeral(); stats != nil {
+							diskUsage, _ := stats.AsInt64()
+							totalDiskUsage += diskUsage
+						}
+					}
+
+					// Convert to MB and store
+					podstats.Usage_disk = totalDiskUsage
+
+					// If pod is on a node, try to get node storage capacity for context
+					if node, exists := nodeMap[pod.Spec.NodeName]; exists {
+						if storage, ok := node.Status.Capacity["ephemeral-storage"]; ok {
+							storageCapacity, _ := storage.AsInt64()
+							if storageCapacity > 0 {
+								podstats.Usage_disk_percent = float32(totalDiskUsage) / float32(storageCapacity) * 100
+							}
+						}
 					}
 				}
 

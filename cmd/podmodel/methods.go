@@ -231,11 +231,11 @@ func headlinePrinter(m *PodUsage, output *strings.Builder, Pods *[]k8s.Pod, maxN
 
 	// Adjust format based on label display
 	if m.Args.LabelToDisplay != "" {
-		m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-" + strconv.Itoa(*maxNsWidth) + "s %-12s %-10s %-10s %-10s %-12s %s\n"
+		m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-" + strconv.Itoa(*maxNsWidth) + "s %-20s %-10s %-10s %-10s %-12s %s\n"
 		values := []interface{}{"Name", "Namespace", "Node", usageHeading, requestHeading, limitHeading, m.Args.LabelAlias, "Usage%"}
 		fmt.Fprintf(output, m.Format, values...)
 	} else {
-		m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-" + strconv.Itoa(*maxNsWidth) + "s %-12s %-10s %-10s %-10s %s\n"
+		m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-" + strconv.Itoa(*maxNsWidth) + "s %-20s %-10s %-10s %-10s %s\n"
 		values := []interface{}{"Name", "Namespace", "Node", usageHeading, requestHeading, limitHeading, "Usage%"}
 		fmt.Fprintf(output, m.Format, values...)
 	}
@@ -249,8 +249,8 @@ func MetricsHandler(m PodUsage, output *strings.Builder) {
 	SortByHandler(m)
 
 	// decide formatting and Maximum width
-	maxNameWidth := 30
-	maxNsWidth := 15
+	maxNameWidth := 15
+	maxNsWidth := 12
 	for _, pod := range filteredPods {
 		if maxNameWidth < len(pod.Name) {
 			maxNameWidth = len(pod.Name)
@@ -282,7 +282,7 @@ func MetricsHandler(m PodUsage, output *strings.Builder) {
 
 			// Truncate node name if too long
 			nodeName := pod.NodeName
-			if len(nodeName) > 10 {
+			if len(nodeName) > 20 {
 				nodeName = nodeName[:9] + "…"
 			}
 
@@ -317,7 +317,42 @@ func MetricsHandler(m PodUsage, output *strings.Builder) {
 
 			// Truncate node name if too long
 			nodeName := pod.NodeName
-			if len(nodeName) > 10 {
+			if len(nodeName) > 20 {
+				nodeName = nodeName[:9] + "…"
+			}
+
+			if m.Args.LabelToDisplay != "" {
+				values := []interface{}{
+					pod.Name,
+					pod.Namespace,
+					nodeName,
+					fmt.Sprintf("%.2f", pod.Usage_cpu),
+					fmt.Sprintf("%.2f", pod.Request_cpu),
+					fmt.Sprintf("%.2f", pod.Limit_cpu),
+					pod.LabelToDisplay,
+					prog.ViewAs(float64(pod.Usage_cpu_percent) / 100.0),
+				}
+				fmt.Fprintf(output, m.Format, values...)
+			} else {
+				values := []interface{}{
+					pod.Name,
+					pod.Namespace,
+					nodeName,
+					fmt.Sprintf("%.2f", pod.Usage_cpu),
+					fmt.Sprintf("%.2f", pod.Request_cpu),
+					fmt.Sprintf("%.2f", pod.Limit_cpu),
+					prog.ViewAs(float64(pod.Usage_cpu_percent) / 100.0),
+				}
+				fmt.Fprintf(output, m.Format, values...)
+			}
+		}
+	} else if m.Args.Metrics == "disk" {
+		for _, pod := range filteredPods {
+			prog := GetBar(float64(pod.Usage_disk_percent) / 100.0)
+
+			// Truncate node name if too long
+			nodeName := pod.NodeName
+			if len(nodeName) > 20 {
 				nodeName = nodeName[:9] + "…"
 			}
 
@@ -347,4 +382,5 @@ func MetricsHandler(m PodUsage, output *strings.Builder) {
 			}
 		}
 	}
+
 }
