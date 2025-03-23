@@ -17,8 +17,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-var semver = "v3.0.3"
-
 /*
 Function: usage
 Description: print usage

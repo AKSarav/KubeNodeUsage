@@ -6,66 +6,64 @@
 ![Go-Version](https://img.shields.io/github/go-mod/go-version/AKSarav/Kube-Node-Usage)![GitHub](https://img.shields.io/github/license/AKSarav/Kube-Node-Usage)![GitHub issues](https://img.shields.io/github/issues/AKSarav/Kube-Node-Usage)![GitHub pull requests](https://img.shields.io/github/issues-pr/AKSarav/Kube-Node-Usage)
 
 
-**KubeNodeUsage** is a Terminal App designed to provide insights into Kubernetes node usage. It offers various options for customization to help you analyze and filter node metrics effectively.
+**KubeNodeUsage** is a Terminal App designed to provide insights into Kubernetes node and pod usage. It offers both interactive exploration and command-line filtering options to help you analyze your cluster effectively.
+
 
 ![Alt text](assets/KubeNodeUsage-demo.gif)
 
 KubeNodeUsage use your local KubeConfig file to connect to the cluster and use Kubernetes API directly using Kubernetes GO SDK
 
-It fetches the Node Metrics from Kubernetes API and apply filters and aggreations to display it in a nice human readable Graphical format as Bar Charts.
+It fetches the Node and Pod Metrics from Kubernetes API and apply filters and aggreations to display it in a nice human readable Graphical format as Bar Charts.
 
 
 
-## Features in NutShell 
 
-KubeNodeUsage helps you to monitor the **CPU**, **Memory** and **Disk** usage of the Nodes in your Kubernetes Cluster
 
-The output can be **sorted**, **filtered**, and **customized** based on your requirements
+## 🌟  Newly added Features ![v3.0.4](https://img.shields.io/badge/v3.0.4-8A2BE2)
+- **Smart Search**: Press `S` to instantly filter and highlight matching entries
+  - Real-time filtering as you type
+  - Headers remain visible for context
+  - Match count display
+  - Press ESC to exit search mode
+- **Horizontal Scrolling**: Use `←` and `→` arrows to view wide content
+  - Smooth scrolling for large tables
+  - Preserves column alignment
+- **New Pod Usage**:
+  - Now you can see Pod usage in KubeNodeUsage
+- **Extra fields in NodeUsage**
+  - Thanks to the Horizontal scrolling - we can show more fields like `Uptime` and `Status`
 
-KubeNodeUsage has different filters to format the output based on the following properties
 
-* NodeName
-* Usage 
-* Free/Availability of Disk,CPU, Memory
-* Max/Capacity of Disk,CPU,Memory
-* Color - We use Green, Red and Orange to represent the usage 
-  * Green - Below 30% Usage 
-  * Orange - Between 30% to 70% Usage
-  * Red - Above 70% Usage
-* Label - Key Value pair to filter the nodes based on the Label presence on the Node ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2)
+## 🚀 Existing Features 
+
+- Filter output by Node, Color, Label
+- Display any specific Node Label as a Custom field
+- Metrics are dynamically updated every 2 seconds, so you get the real time data always
+- Choose to not display the ClusterInfo for additional security
+- No data collected everything is local
+- Sorting with Ascending and Descending
+
+### Options for Filtering and Sorting
+Perfect for scripting and automation:
+- **Node/Pod Filtering**: 
+  - `--filternodes`: Filter by node name using regex
+  - `--filtercolor`: Filter by usage levels (green/orange/red)
+  - `--filterlabel`: Filter by label key-value pairs
+- **Sorting Options**:
+  - `--sortby`: Sort by various metrics (name, free, usage, etc.)
+  - `--desc`: Reverse sort order
+- **Display Options**:
+  - `--noinfo`: To not display the Cluster information ( can sometimes be confidential ) - Default is to display
+  - `--label`: To display a specific lable with custom FieldName
+
+
 
 &nbsp;
-
-All the filtering is controlled by three main flags
-- `filternodes` - This is used to filter the nodes based on the Node Name using Regular Expression
-- `filtercolor` - This is used to filter the nodes based on the Color Category ( Green, Orange, Red)
-- `filterlabel` - This is used to filter the nodes based on the Label Key Value pair ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2)
-
-&nbsp;
-
-You can sort the output using following flags
-- `sortby` - This is used to sort the output based on the specific metric ( name, free, usage, color, capacity, max)
-- `desc` - This is used to sort the output in descending order
-
-By Default KubeNodeUsage prints the Cluster info you can disable it with `--noinfo` flag
-
-If you want to display a specific label as an output - you can use `--label` option with your desired output alias.
-
-We have example commands and screenshots to help you. Feel free to reach out for any help.
-
-&nbsp;
-
-**Additional Key Features include**
-* Ability to display the Label information as a new column in the output ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2)
-* Displaying the Total Pods count in the Cluster ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2)
-* To Turn off the Cluster Info display ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2)
-* Label - You can display the Label information as a new column in the output ![v3.0.2](https://img.shields.io/badge/new_on_v3.0.2-8A2BE2) 
-
 
 > Refer the Options and Screenshots section for more details
 
 &nbsp;
-## Screenshots :camera:
+## Screenshots 📸
 
 :sparkle: Screenshot of Latest Version 3.0.1 with Cluster Info 
 
@@ -98,6 +96,7 @@ I have tested it with the following K8s clusters
 * GKE - Google Kubernetes Engine
 * Minikube
 * Kind Cluster
+* Rancher Kubernetes Engine
 
 **Versions**
 
@@ -124,9 +123,7 @@ If the `kubectl`commands are not working - its highly likely KubeNodeUsage would
 &nbsp; 
 
 #### Is it secure ? How about Data Privacy :lock:
-KubeNodeUsage do not collect any data or send anywhere 
-
-KubeNodeUsage Source code is Public, Feel free to download and validate it yourself
+KubeNodeUsage do not collect any data of your cluster or usage. 
 &nbsp;
 
 ## How to Download :arrow_double_down:
@@ -202,10 +199,7 @@ You can find the detail information on all available options here
 
 - `filterlabel`: Filter nodes based on the label key-value pair. ( New feature in V3.0.2) Syntax is `--filterlabel=<label-key>=<label-value>`
 
-
-
 - `debug`: Enable debug mode. ( Prints more logging for debug)
-
 
 - `sortby`: Sort the output by a specific metric. Valid options include:
 
@@ -224,7 +218,7 @@ You can find the detail information on all available options here
   
 
 &nbsp;
-## Examples:
+## Examples 📝
 
 ```bash
 # Display help information
@@ -288,11 +282,6 @@ KubeNodeUsage --filterlabel topology.kubernetes.io/zone=us-east-1a
 
 
 ```
-&nbsp;
-## Todo
-
-* Pod Usage stats to be added as a feature
-* Requested vs Limits metrics to be added
 
 &nbsp;
 

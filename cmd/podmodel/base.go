@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	helpStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")).Render
-	searchStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")).Bold(true)
-	highlightStyle = lipgloss.NewStyle().Background(lipgloss.Color("#ab2770"))
+	helpStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")).Render
+	searchStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")).Bold(true)
+	// highlightStyle = lipgloss.NewStyle().Background(lipgloss.Color("#fff0f4"))
 )
 
 type tickMsg time.Time
@@ -192,30 +192,55 @@ func (m PodUsage) View() string {
 		return "Initializing..."
 	}
 
-	// Apply horizontal scrolling and search highlighting
 	lines := strings.Split(m.content, "\n")
-	var scrolledLines []string
+	var displayLines []string
 
 	searchTerm := strings.ToLower(m.searchInput.Value())
-	for _, line := range lines {
-		if len(line) > m.xOffset {
-			displayLine := line[m.xOffset:]
-			// If searching and line contains search term, highlight it
-			if m.searching && searchTerm != "" && strings.Contains(strings.ToLower(displayLine), searchTerm) {
-				displayLine = highlightStyle.Render(displayLine)
-			}
-			scrolledLines = append(scrolledLines, displayLine)
+
+	// Always include the header lines - till the table header
+	headerLines := 14
+	for i := 0; i < min(headerLines, len(lines)); i++ {
+		if len(lines[i]) > m.xOffset {
+			displayLines = append(displayLines, lines[i][m.xOffset:])
 		} else {
-			scrolledLines = append(scrolledLines, "")
+			displayLines = append(displayLines, "")
 		}
 	}
 
-	viewportContent := strings.Join(scrolledLines, "\n")
+	// For the rest of the content
+	for i := headerLines; i < len(lines); i++ {
+		line := lines[i]
+		// If searching, only include lines that match the search term
+		if m.searching && searchTerm != "" {
+			if strings.Contains(strings.ToLower(line), searchTerm) {
+				if len(line) > m.xOffset {
+					displayLine := line[m.xOffset:]
+					// displayLine = highlightStyle.Render(displayLine)
+					displayLines = append(displayLines, displayLine)
+				} else {
+					displayLines = append(displayLines, "")
+				}
+			}
+		} else {
+			// If not searching, include all lines
+			if len(line) > m.xOffset {
+				displayLines = append(displayLines, line[m.xOffset:])
+			} else {
+				displayLines = append(displayLines, "")
+			}
+		}
+	}
+
+	viewportContent := strings.Join(displayLines, "\n")
 	m.viewport.SetContent(viewportContent)
 
 	var helpText string
 	if m.searching {
-		helpText = fmt.Sprintf("\n%s %s (ESC to exit search)", searchStyle.Render("Search:"), m.searchInput.View())
+		matchCount := len(displayLines) - headerLines // Subtract header lines
+		helpText = fmt.Sprintf("\n%s %s (%d matches) (ESC to exit search)",
+			searchStyle.Render("Search:"),
+			m.searchInput.View(),
+			matchCount)
 	} else {
 		helpText = helpStyle("\nUse ← and → to scroll horizontally, S to search, Q or Ctrl+C to quit")
 	}
