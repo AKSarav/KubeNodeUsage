@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/AKSarav/KubeNodeUsage/v3/utils"
 
@@ -35,6 +36,8 @@ type Node struct {
 	TotalPods            string
 	LabelToDisplay       string
 	Labels               map[string]string
+	Uptime               string
+	Status               string
 }
 
 type Cluster struct {
@@ -232,6 +235,33 @@ func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 			if node.Name == nm.Name {
 				// fmt.Println("Node Name:", node.Name)
 				nodestats.Name = node.Name
+
+				// Capture the Ready status of the node
+				nodestats.Status = "NotReady" // Default to NotReady
+				for _, condition := range node.Status.Conditions {
+					if condition.Type == core.NodeReady {
+						if condition.Status == core.ConditionTrue {
+							nodestats.Status = "Ready"
+						}
+						break
+					}
+				}
+
+				// capture Uptime
+				uptimeDuration := time.Since(node.CreationTimestamp.Time)
+
+				// Convert the time duration to a simple display format
+				// Use days if more than 24 hours, hours if more than 60 minutes, otherwise minutes
+				if uptimeDuration.Hours() > 24 {
+					days := int(uptimeDuration.Hours() / 24)
+					nodestats.Uptime = fmt.Sprintf("%dd", days)
+				} else if uptimeDuration.Hours() >= 1 {
+					hours := int(uptimeDuration.Hours())
+					nodestats.Uptime = fmt.Sprintf("%dh", hours)
+				} else {
+					minutes := int(uptimeDuration.Minutes())
+					nodestats.Uptime = fmt.Sprintf("%dm", minutes)
+				}
 
 				// Counting Total Pods in the Node
 				var totalpods int

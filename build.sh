@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
 
-Version=$1
+SEMVER=$1
 
-if [ -z $Version ]; then
+if [ -z $SEMVER ]; then
     echo "Version Identifier is required"
     exit 1
 fi
 
 # check if the input is only numbers with a dot
-if ! [[ $Version =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+if ! [[ $SEMVER =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
 	echo "Version Identifier should be in the format of x.y.z"
 	exit 1
 fi
 
+# Find the version declaration on the version.go file and change it to the new version 
+echo "Updating the version in version.go"
+sed -i -e "s/Version = \"v[0-9]*\\.[0-9]*\\.[0-9]*\"/Version = \"v${SEMVER}\"/" utils/version.go
+
+# open the version.go file and print the version
+cat utils/version.go
 
 package_name="KubeNodeUsage"
 
@@ -26,7 +32,7 @@ do
     platform_split=(${platform//\// })
     GOOS=${platform_split[0]}
     GOARCH=${platform_split[1]}
-    output_name=$package_name'-'$GOOS'-'$GOARCH'-v'$Version
+    output_name=$package_name'-'$GOOS'-'$GOARCH'-v'$SEMVER
     if [ $GOOS = "windows" ]; then
         output_name+='.exe'
     fi
@@ -52,17 +58,14 @@ do
     fi
 done
 
-# Find the version declaration on the main.go file and change it to the new version
-# var semver = "v3.0.2" 
-echo "Updating the version in main.go"
-sed -i '' "s/var semver = \"v[0-9]*\.[0-9]*\.[0-9]*\"/var semver = \"v$Version\"/g" main.go
+
 
 # Create the Homebrew formula
 cat <<EOF > kubenodeusage.rb
 class Kubenodeusage < Formula
     desc "KubeNodeUsage is a command line utility to get the usage of the nodes and pods in a Kubernetes cluster graphically."
     homepage "https://github.com/AKSarav/KubeNodeUsage"
-    version "$Version"
+    version "$SEMVER"
     license "MIT"
 
 EOF
@@ -77,37 +80,37 @@ while read -r line; do
     if [ "$GOOS" == "linux" ] && [ "$GOARCH" == "amd64" ]; then
         cat <<EOF >> kubenodeusage.rb
     if OS.linux? && Hardware::CPU.intel?
-      url "https://github.com/AKSarav/KubeNodeUsage/releases/download/v$Version/KubeNodeUsage-linux-amd64-v$Version.zip"
+      url "https://github.com/AKSarav/KubeNodeUsage/releases/download/v$SEMVER/KubeNodeUsage-linux-amd64-v$SEMVER.zip"
       sha256 "$sha256"
     elsif OS.linux? && Hardware::CPU.arm?
 EOF
     elif [ "$GOOS" == "linux" ] && [ "$GOARCH" == "arm64" ]; then
         cat <<EOF >> kubenodeusage.rb
-      url "https://github.com/AKSarav/KubeNodeUsage/releases/download/v$Version/KubeNodeUsage-linux-arm64-v$Version.zip"
+      url "https://github.com/AKSarav/KubeNodeUsage/releases/download/v$SEMVER/KubeNodeUsage-linux-arm64-v$SEMVER.zip"
       sha256 "$sha256"
     elsif OS.mac? && Hardware::CPU.intel?
 EOF
     elif [ "$GOOS" == "darwin" ] && [ "$GOARCH" == "amd64" ]; then
         cat <<EOF >> kubenodeusage.rb
-      url "https://github.com/AKSarav/KubeNodeUsage/releases/download/v$Version/KubeNodeUsage-darwin-amd64-v$Version.zip"
+      url "https://github.com/AKSarav/KubeNodeUsage/releases/download/v$SEMVER/KubeNodeUsage-darwin-amd64-v$SEMVER.zip"
       sha256 "$sha256"
     elsif OS.mac? && Hardware::CPU.arm?
 EOF
     elif [ "$GOOS" == "darwin" ] && [ "$GOARCH" == "arm64" ]; then
         cat <<EOF >> kubenodeusage.rb
-      url "https://github.com/AKSarav/KubeNodeUsage/releases/download/v$Version/KubeNodeUsage-darwin-arm64-v$Version.zip"
+      url "https://github.com/AKSarav/KubeNodeUsage/releases/download/v$SEMVER/KubeNodeUsage-darwin-arm64-v$SEMVER.zip"
       sha256 "$sha256"
     elsif OS.windows? && Hardware::CPU.intel?
 EOF
     elif [ "$GOOS" == "windows" ] && [ "$GOARCH" == "amd64" ]; then
         cat <<EOF >> kubenodeusage.rb
-      url "https://github.com/AKSarav/KubeNodeUsage/releases/download/v$Version/KubeNodeUsage-windows-amd64-v$Version.exe.zip"
+      url "https://github.com/AKSarav/KubeNodeUsage/releases/download/v$SEMVER/KubeNodeUsage-windows-amd64-v$SEMVER.exe.zip"
       sha256 "$sha256"
     elsif OS.windows? && Hardware::CPU.arm?
 EOF
     elif [ "$GOOS" == "windows" ] && [ "$GOARCH" == "arm64" ]; then
         cat <<EOF >> kubenodeusage.rb
-      url "https://github.com/AKSarav/KubeNodeUsage/releases/download/v$Version/KubeNodeUsage-windows-arm64-v$Version.exe.zip"
+      url "https://github.com/AKSarav/KubeNodeUsage/releases/download/v$SEMVER/KubeNodeUsage-windows-arm64-v$SEMVER.exe.zip"
       sha256 "$sha256"
     end
 EOF
