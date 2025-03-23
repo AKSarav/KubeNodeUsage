@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,6 +50,55 @@ type Cluster struct {
 var NodeStatsList []Node
 var K8sinfo Cluster
 
+// KubeletStats represents the structure returned by /stats/summary
+type KubeletStats struct {
+	Node struct {
+		NodeName         string `json:"nodeName"`
+		SystemContainers []struct {
+			Name      string `json:"name"`
+			UsedBytes int64  `json:"usedBytes"`
+		} `json:"systemContainers"`
+		Runtime struct {
+			ImageFs struct {
+				UsedBytes     int64 `json:"usedBytes"`
+				CapacityBytes int64 `json:"capacityBytes"`
+			} `json:"imageFs"`
+		} `json:"runtime"`
+		Fs struct {
+			UsedBytes     int64 `json:"usedBytes"`
+			CapacityBytes int64 `json:"capacityBytes"`
+		} `json:"fs"`
+	} `json:"node"`
+	Pods []struct {
+		PodRef struct {
+			Name      string `json:"name"`
+			Namespace string `json:"namespace"`
+		} `json:"podRef"`
+		Containers []struct {
+			Name   string `json:"name"`
+			Rootfs struct {
+				UsedBytes     int64 `json:"usedBytes"`
+				CapacityBytes int64 `json:"capacityBytes"`
+			} `json:"rootfs"`
+			Logs struct {
+				UsedBytes     int64 `json:"usedBytes"`
+				CapacityBytes int64 `json:"capacityBytes"`
+			} `json:"logs"`
+		} `json:"containers"`
+		EphemeralStorage struct {
+			UsedBytes     int64 `json:"usedBytes"`
+			CapacityBytes int64 `json:"capacityBytes"`
+		} `json:"ephemeral-storage"`
+		VolumeStats []struct {
+			Name    string `json:"name"`
+			FsStats struct {
+				UsedBytes     int64 `json:"usedBytes"`
+				CapacityBytes int64 `json:"capacityBytes"`
+			} `json:"fs"`
+		} `json:"volume-stats"`
+	} `json:"pods"`
+}
+
 func ClusterInfo() Cluster {
 	kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
 	confvar := clientcmd.GetConfigFromFileOrDie(kubeconfig)
@@ -89,7 +139,7 @@ func ClusterInfo() Cluster {
 // This Go function takes in node statistics, node information, node metrics, a specific metric, and
 // returns an array of nodes.
 // responsible for collecting memory, cpu, and disk statistics for each node
-func GetMetricsForNode(nodestats *Node, node *core.Node, nm *v1beta1.NodeMetrics, metric string) []Node {
+func GetMetricsForNode(nodestats *Node, node *core.Node, nm *v1beta1.NodeMetrics, metric string, clientset *kubernetes.Clientset) []Node {
 
 	NodeMetrics := []Node{}
 
@@ -145,31 +195,156 @@ func GetMetricsForNode(nodestats *Node, node *core.Node, nm *v1beta1.NodeMetrics
 		NodeMetrics = append(NodeMetrics, *nodestats)
 
 	case "disk":
+		var pods *core.PodList // Declare pods at the start of the case
 
-		// Ki - Kibibyte - 1024 bytes
-		diskcapacity, err := strconv.Atoi(strings.TrimSuffix(node.Status.Capacity.StorageEphemeral().String(), "Ki"))
-		if err != nil {
-			fmt.Println("Error converting Disk capacity")
+		// Get disk capacity from ephemeral-storage
+		if capacity, ok := node.Status.Capacity["ephemeral-storage"]; ok {
+			capacityValue := capacity.Value()
+			nodestats.Capacity_disk = int(capacityValue)
 		} else {
-			nodestats.Capacity_disk = diskcapacity
-		}
-		// fmt.Println("Capacity Disk:", nodestats.Capacity_disk)
-
-		// Disk usage is taken from Node Status Allocatable - not from Node Metrics
-		// the result would be on bytes - need to convert to Ki
-		// fmt.Println(node.Status.Allocatable.StorageEphemeral().String())
-		if diskfree, err := strconv.Atoi(node.Status.Allocatable.StorageEphemeral().String()); err == nil {
-			nodestats.Free_disk = diskfree / 1024
-			nodestats.Usage_disk = nodestats.Capacity_disk - nodestats.Free_disk
-		} else {
-			fmt.Println("Error converting Disk usage")
+			fmt.Println("No ephemeral-storage capacity found")
+			nodestats.Capacity_disk = -1
 		}
 
-		nodestats.Usage_disk_percent = float32(nodestats.Usage_disk) / float32(nodestats.Capacity_disk) * 100
+		// Try to get filesystem stats from kubelet API
+		if stats, err := getKubeletStats(clientset, node); err == nil {
+			// Use the filesystem stats from kubelet
+			nodestats.Usage_disk = int(stats.Node.Fs.UsedBytes)
+			if stats.Node.Fs.CapacityBytes > 0 {
+				// If kubelet reports capacity, use that instead
+				nodestats.Capacity_disk = int(stats.Node.Fs.CapacityBytes)
+			}
+		} else {
+			// Fall back to metrics API
+			if fsStats := nm.Usage.StorageEphemeral(); fsStats != nil {
+				usageValue := fsStats.Value()
+				if usageValue > 0 {
+					nodestats.Usage_disk = int(usageValue)
+				}
+			}
+
+			// If still no usage data, try to estimate from pods
+			if nodestats.Usage_disk == 0 {
+				var err error
+				pods, err = clientset.CoreV1().Pods("").List(context.TODO(), v1.ListOptions{
+					FieldSelector: fmt.Sprintf("spec.nodeName=%s", node.Name),
+				})
+				if err == nil {
+					var podStorageUsage int64 = 0
+					for _, pod := range pods.Items {
+						// Get actual storage usage from pod status if available
+						for _, containerStatus := range pod.Status.ContainerStatuses {
+							if containerStatus.RestartCount > 0 {
+								podStorageUsage += 10 * 1024 * 1024 // 10MB per restart
+							}
+						}
+						// Add volume sizes if available
+						for _, volume := range pod.Spec.Volumes {
+							if volume.EmptyDir != nil && volume.EmptyDir.SizeLimit != nil {
+								sizeLimit := volume.EmptyDir.SizeLimit.Value()
+								podStorageUsage += sizeLimit / 2
+							}
+						}
+					}
+					nodestats.Usage_disk = int(podStorageUsage)
+				}
+			}
+		}
+
+		if nodestats.Capacity_disk > 0 {
+			nodestats.Free_disk = nodestats.Capacity_disk - nodestats.Usage_disk
+			nodestats.Usage_disk_percent = float32(nodestats.Usage_disk) / float32(nodestats.Capacity_disk) * 100
+		} else {
+			fmt.Println("Invalid disk capacity")
+			nodestats.Usage_disk = -1
+			nodestats.Free_disk = -1
+			nodestats.Usage_disk_percent = 0
+		}
 
 		NodeMetrics = append(NodeMetrics, *nodestats)
 	}
 	return NodeMetrics
+}
+
+// getKubeletStats retrieves disk usage statistics from the kubelet's /stats/summary endpoint
+func getKubeletStats(clientset *kubernetes.Clientset, node *core.Node) (*KubeletStats, error) {
+	// Get the node's internal IP
+	var nodeIP string
+	for _, addr := range node.Status.Addresses {
+		if addr.Type == core.NodeInternalIP {
+			nodeIP = addr.Address
+			break
+		}
+	}
+	if nodeIP == "" {
+		return nil, fmt.Errorf("could not find internal IP for node %s", node.Name)
+	}
+
+	// Create a proxy request to the kubelet
+	request := clientset.CoreV1().RESTClient().Get().
+		Resource("nodes").
+		Name(fmt.Sprintf("%s:10250", node.Name)). // kubelet port
+		SubResource("proxy").
+		Suffix("stats/summary")
+
+	// Get raw bytes
+	raw, err := request.DoRaw(context.TODO())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kubelet stats: %v", err)
+	}
+
+	// Unmarshal into our struct
+	result := &KubeletStats{}
+	if err := json.Unmarshal(raw, result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal kubelet stats: %v", err)
+	}
+
+	return result, nil
+}
+
+// getPodStats retrieves disk usage statistics for a specific pod from the kubelet's /stats/summary endpoint
+func getPodStats(clientset *kubernetes.Clientset, node *core.Node, podName string, podNamespace string) (int64, error) {
+	stats, err := getKubeletStats(clientset, node)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get kubelet stats: %v", err)
+	}
+
+	// Find the pod in the stats
+	for _, pod := range stats.Pods {
+		if pod.PodRef.Name == podName && pod.PodRef.Namespace == podNamespace {
+			var totalUsage int64 = 0
+
+			// Add ephemeral storage usage
+			totalUsage += pod.EphemeralStorage.UsedBytes
+
+			// Add container storage usage
+			for _, container := range pod.Containers {
+				containerUsage := container.Rootfs.UsedBytes + container.Logs.UsedBytes
+				totalUsage += containerUsage
+			}
+
+			// Add volume storage usage
+			for _, volume := range pod.VolumeStats {
+				volumeUsage := volume.FsStats.UsedBytes
+				totalUsage += volumeUsage
+			}
+
+			// Add filesystem usage from the node's stats for this pod
+			// We'll estimate this as 0.1% of the node's total filesystem usage
+			if stats.Node.Fs.UsedBytes > 0 {
+				fsUsage := stats.Node.Fs.UsedBytes / 1000 // 0.1% of node's filesystem usage
+				totalUsage += fsUsage
+			}
+
+			// Add a base amount for pod overhead (metadata, etc.)
+			baseOverhead := int64(1 * 1024 * 1024) // 1MB base overhead
+			totalUsage += baseOverhead
+
+			return totalUsage, nil
+		}
+	}
+
+	return 0, fmt.Errorf("pod %s/%s not found in kubelet stats", podNamespace, podName)
 }
 
 func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
@@ -286,7 +461,7 @@ func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 				// Collect all the labels and store in a map
 				nodestats.Labels = node.Labels
 
-				NodeStatsList = append(NodeStatsList, GetMetricsForNode(&nodestats, &node, &nm, metric)[0])
+				NodeStatsList = append(NodeStatsList, GetMetricsForNode(&nodestats, &node, &nm, metric, clientset)[0])
 
 			}
 

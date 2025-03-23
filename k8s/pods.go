@@ -29,7 +29,7 @@ type Pod struct {
 	Limit_cpu            float32
 	Usage_memory_percent float32
 	Usage_cpu_percent    float32
-	Usage_disk           int64   // Total disk usage in bytes
+	Usage_disk           float64 // Total disk usage in MB
 	Usage_disk_percent   float32 // Disk usage percentage
 	Status               string
 	LabelToDisplay       string
@@ -88,14 +88,20 @@ func Pods(inputs *utils.Inputs) (PodStatsList []Pod) {
 	}
 
 	// Parsing Every Pod and collecting information
-	for _, pm := range podMetrics.Items {
-		for _, pod := range pods.Items {
+	for _, pod := range pods.Items {
+		for _, pm := range podMetrics.Items {
 			if pod.Name == pm.Name && pod.Namespace == pm.Namespace {
 				podstats := Pod{}
 				podstats.Name = pod.Name
 				podstats.Namespace = pod.Namespace
 				podstats.NodeName = pod.Spec.NodeName
 				podstats.Status = string(pod.Status.Phase)
+
+				// Get the node for this pod
+				node, exists := nodeMap[pod.Spec.NodeName]
+				if !exists {
+					continue
+				}
 
 				// Get pod container metrics
 				switch metric {
@@ -182,26 +188,16 @@ func Pods(inputs *utils.Inputs) (PodStatsList []Pod) {
 					}
 
 				case "disk":
-					// Calculate total disk usage
-					var totalDiskUsage int64 = 0
+					// Try to get disk usage from kubelet stats first
+					if diskUsage, err := getPodStats(clientset, node, pod.Name, pod.Namespace); err == nil {
+						// Convert bytes to MB
+						podstats.Usage_disk = float64(diskUsage) / float64(1024*1024)
 
-					for _, container := range pm.Containers {
-						// Get filesystem stats if available
-						if stats := container.Usage.StorageEphemeral(); stats != nil {
-							diskUsage, _ := stats.AsInt64()
-							totalDiskUsage += diskUsage
-						}
-					}
-
-					// Convert to MB and store
-					podstats.Usage_disk = totalDiskUsage
-
-					// If pod is on a node, try to get node storage capacity for context
-					if node, exists := nodeMap[pod.Spec.NodeName]; exists {
+						// Calculate percentage against node capacity
 						if storage, ok := node.Status.Capacity["ephemeral-storage"]; ok {
-							storageCapacity, _ := storage.AsInt64()
+							storageCapacity := storage.Value()
 							if storageCapacity > 0 {
-								podstats.Usage_disk_percent = float32(totalDiskUsage) / float32(storageCapacity) * 100
+								podstats.Usage_disk_percent = float32(diskUsage) / float32(storageCapacity) * 100
 							}
 						}
 					}

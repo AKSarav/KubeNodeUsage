@@ -290,7 +290,16 @@ func MetricsHandler(m NodeUsage, output *strings.Builder) {
 	} else if m.Args.Metrics == "disk" {
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_disk_percent) / 100.0)
-			values := []interface{}{node.Name, strconv.Itoa(node.Free_disk / 1024 / 1024), strconv.Itoa(node.Capacity_disk / 1024 / 1024), node.TotalPods, node.Uptime, node.Status}
+			// Convert bytes to GB (1 GB = 1024^3 bytes)
+			gbDivisor := 1024 * 1024 * 1024
+			values := []interface{}{
+				node.Name,
+				fmt.Sprintf("%.1f", float64(node.Free_disk)/float64(gbDivisor)),
+				fmt.Sprintf("%.1f", float64(node.Capacity_disk)/float64(gbDivisor)),
+				node.TotalPods,
+				node.Uptime,
+				node.Status,
+			}
 			if m.Args.LabelToDisplay != "" {
 				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
 			} else {
@@ -298,6 +307,5 @@ func MetricsHandler(m NodeUsage, output *strings.Builder) {
 			}
 			fmt.Fprintf(output, m.Format, values...)
 		}
-
 	}
 }
