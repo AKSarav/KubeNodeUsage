@@ -12,8 +12,7 @@ Available to download from `Brew` and `Goinstall`
 
 You no longer have to wait for that `prometheus` and `grafana` - Just check the usage visually right from terminal.
 
-
-[![asciicast](https://asciinema.org/a/709490.svg)](https://asciinema.org/a/709490)
+![Alt text](assets/KubeNodeUsage3.0.4.gif)
 
 KubeNodeUsage use your local KubeConfig file to connect to the cluster and use Kubernetes API directly using Kubernetes GO SDK
 
