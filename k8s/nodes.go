@@ -451,8 +451,7 @@ func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
 				if inputs.LabelToDisplay != "" {
 					// check if the label exists in the node - if not, set output to "Not Found"
 					if _, ok := node.Labels[inputs.LabelToDisplay]; !ok {
-						fmt.Println("Label does not exist in the Node")
-						nodestats.LabelToDisplay = "Not Found"
+						nodestats.LabelToDisplay = "NA"
 					} else {
 						nodestats.LabelToDisplay = node.Labels[inputs.LabelToDisplay]
 					}

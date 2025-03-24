@@ -30,6 +30,7 @@ type Pod struct {
 	Usage_memory_percent float32
 	Usage_cpu_percent    float32
 	Usage_disk           float64 // Total disk usage in MB
+	Node_disk_capacity   float64 // Node's total disk capacity in GB
 	Usage_disk_percent   float32 // Disk usage percentage
 	Status               string
 	LabelToDisplay       string
@@ -193,12 +194,10 @@ func Pods(inputs *utils.Inputs) (PodStatsList []Pod) {
 						// Convert bytes to MB
 						podstats.Usage_disk = float64(diskUsage) / float64(1024*1024)
 
-						// Calculate percentage against node capacity
+						// Get and store node's disk capacity in GB
 						if storage, ok := node.Status.Capacity["ephemeral-storage"]; ok {
 							storageCapacity := storage.Value()
-							if storageCapacity > 0 {
-								podstats.Usage_disk_percent = float32(diskUsage) / float32(storageCapacity) * 100
-							}
+							podstats.Node_disk_capacity = float64(storageCapacity) / float64(1024*1024*1024) // Convert to GB
 						}
 					}
 				}
@@ -206,7 +205,7 @@ func Pods(inputs *utils.Inputs) (PodStatsList []Pod) {
 				// Display Label if provided
 				if inputs.LabelToDisplay != "" {
 					if _, ok := pod.Labels[inputs.LabelToDisplay]; !ok {
-						podstats.LabelToDisplay = "Not Found"
+						podstats.LabelToDisplay = "NA"
 					} else {
 						podstats.LabelToDisplay = pod.Labels[inputs.LabelToDisplay]
 					}

@@ -224,7 +224,7 @@ func FilterForColor(m PodUsage) []k8s.Pod {
 
 func PrintDesign(output *strings.Builder, maxNameWidth int, maxNsWidth int, isMetricsDisk bool) {
 	if isMetricsDisk {
-		output.WriteString(strings.Repeat("-", maxNameWidth+maxNsWidth+40) + "\n")
+		output.WriteString(strings.Repeat("-", maxNameWidth+maxNsWidth+55) + "\n")
 	} else {
 		output.WriteString(strings.Repeat("-", maxNameWidth+maxNsWidth+60) + "\n")
 	}
@@ -239,12 +239,12 @@ func headlinePrinter(m *PodUsage, output *strings.Builder, Pods *[]k8s.Pod, maxN
 	// Adjust format based on metric type and label display
 	if m.Args.Metrics == "disk" {
 		if m.Args.LabelToDisplay != "" {
-			m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-" + strconv.Itoa(*maxNsWidth) + "s %-20s %-10s %-12s %s\n"
-			values := []interface{}{"Name", "Namespace", "Node", usageHeading, m.Args.LabelAlias, "Usage%"}
+			m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-" + strconv.Itoa(*maxNsWidth) + "s %-20s %-10s %-15s %-12s\n"
+			values := []interface{}{"Name", "Namespace", "Node", usageHeading, "Node Cap(GB)", m.Args.LabelAlias}
 			fmt.Fprintf(output, m.Format, values...)
 		} else {
-			m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-" + strconv.Itoa(*maxNsWidth) + "s %-20s %-10s %s\n"
-			values := []interface{}{"Name", "Namespace", "Node", usageHeading, "Usage%"}
+			m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-" + strconv.Itoa(*maxNsWidth) + "s %-20s %-10s %-15s\n"
+			values := []interface{}{"Name", "Namespace", "Node", usageHeading, "Node Cap(GB)"}
 			fmt.Fprintf(output, m.Format, values...)
 		}
 	} else {
@@ -292,6 +292,11 @@ func MetricsHandler(m PodUsage, output *strings.Builder) {
 	}
 
 	fmt.Fprint(output, "# ", strcase.ToCamel(m.Args.Metrics), " Metrics for Pods\n\n")
+
+	if m.Args.Metrics == "disk" {
+		fmt.Fprint(output, "# Usage % is not calculated as comparing the pod disk usage against node capacity would not make sense\n\n")
+		utils.HeaderLines = 16
+	}
 
 	headlinePrinter(&m, output, &filteredPods, &maxNameWidth, &maxNsWidth)
 	PrintDesign(output, maxNameWidth, maxNsWidth, m.Args.Metrics == "disk")
@@ -368,8 +373,6 @@ func MetricsHandler(m PodUsage, output *strings.Builder) {
 		}
 	} else if m.Args.Metrics == "disk" {
 		for _, pod := range filteredPods {
-			prog := GetBar(float64(pod.Usage_disk_percent) / 100.0)
-
 			// Truncate node name if too long
 			nodeName := pod.NodeName
 			if len(nodeName) > 20 {
@@ -382,8 +385,8 @@ func MetricsHandler(m PodUsage, output *strings.Builder) {
 					pod.Namespace,
 					nodeName,
 					fmt.Sprintf("%.2f", pod.Usage_disk),
+					fmt.Sprintf("%.1f", pod.Node_disk_capacity),
 					pod.LabelToDisplay,
-					prog.ViewAs(float64(pod.Usage_disk_percent) / 100.0),
 				}
 				fmt.Fprintf(output, m.Format, values...)
 			} else {
@@ -392,7 +395,7 @@ func MetricsHandler(m PodUsage, output *strings.Builder) {
 					pod.Namespace,
 					nodeName,
 					fmt.Sprintf("%.2f", pod.Usage_disk),
-					prog.ViewAs(float64(pod.Usage_disk_percent) / 100.0),
+					fmt.Sprintf("%.1f", pod.Node_disk_capacity),
 				}
 				fmt.Fprintf(output, m.Format, values...)
 			}

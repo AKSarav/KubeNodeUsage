@@ -198,8 +198,7 @@ func (m PodUsage) View() string {
 	searchTerm := strings.ToLower(m.searchInput.Value())
 
 	// Always include the header lines - till the table header
-	headerLines := 14
-	for i := 0; i < min(headerLines, len(lines)); i++ {
+	for i := 0; i < min(utils.HeaderLines, len(lines)); i++ {
 		if len(lines[i]) > m.xOffset {
 			displayLines = append(displayLines, lines[i][m.xOffset:])
 		} else {
@@ -208,7 +207,7 @@ func (m PodUsage) View() string {
 	}
 
 	// For the rest of the content
-	for i := headerLines; i < len(lines); i++ {
+	for i := utils.HeaderLines; i < len(lines); i++ {
 		line := lines[i]
 		// If searching, only include lines that match the search term
 		if m.searching && searchTerm != "" {
@@ -236,7 +235,7 @@ func (m PodUsage) View() string {
 
 	var helpText string
 	if m.searching {
-		matchCount := len(displayLines) - headerLines // Subtract header lines
+		matchCount := len(displayLines) - utils.HeaderLines // Subtract header lines
 		helpText = fmt.Sprintf("\n%s %s (%d matches) (ESC to exit search)",
 			searchStyle.Render("Search:"),
 			m.searchInput.View(),
