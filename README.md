@@ -6,16 +6,18 @@
 ![Go-Version](https://img.shields.io/github/go-mod/go-version/AKSarav/Kube-Node-Usage)![GitHub](https://img.shields.io/github/license/AKSarav/Kube-Node-Usage)![GitHub issues](https://img.shields.io/github/issues/AKSarav/Kube-Node-Usage)![GitHub pull requests](https://img.shields.io/github/issues-pr/AKSarav/Kube-Node-Usage)
 
 
-**KubeNodeUsage** is a Terminal App designed to provide insights into Kubernetes node and pod usage. It offers both interactive exploration and command-line filtering options to help you analyze your cluster effectively.
+**KubeNodeUsage** is a Terminal App designed to provide insights into Kubernetes node and pod usage. It offers both interactive exploration and command-line filtering options to help you analyze your cluster effectively right from your terminal .
+
+Available to download from `Brew` and `Goinstall`
+
+You no longer have to wait for that `prometheus` and `grafana` - Just check the usage visually right from terminal.
 
 
-![Alt text](assets/KubeNodeUsage-demo.gif)
+[![asciicast](https://asciinema.org/a/709490.svg)](https://asciinema.org/a/709490)
 
 KubeNodeUsage use your local KubeConfig file to connect to the cluster and use Kubernetes API directly using Kubernetes GO SDK
 
 It fetches the Node and Pod Metrics from Kubernetes API and apply filters and aggreations to display it in a nice human readable Graphical format as Bar Charts.
-
-
 
 
 
@@ -32,6 +34,9 @@ It fetches the Node and Pod Metrics from Kubernetes API and apply filters and ag
   - Now you can see Pod usage in KubeNodeUsage
 - **Extra fields in NodeUsage**
   - Thanks to the Horizontal scrolling - we can show more fields like `Uptime` and `Status`
+- **More accurate diskusage calculation**
+  - Bringing you the accurate diskusage calculation for POD and Node using /stats/summary endpoint in Kubelet
+
 
 
 ## 🚀 Existing Features 
@@ -82,6 +87,17 @@ Perfect for scripting and automation:
 :sparkle: Screenshot of Label Filtering with FilterLabel
 
 ![Alt text](assets/KubeNodeUsage-FilterLabel.png)
+
+:sparkle: Screenshot of Search and PodUsage
+![Alt text](assets/KubeNodeUsagev3.0.4.png)
+
+:sparkle: More powerful DiskUsage for Pods and Nodes powered by Kubelet /stats endpoint
+
+![Alt text](assets/KubeNodeUsage-Disk-Pods.png)
+
+:sparkle: Pods Memory by Sort - All the filters and sorts are available for Pods too
+
+![Alt text](assets/KubeNodeUsageMemorySort.png)
 
 ## Kubernetes Supported Versions / Clusters :white_check_mark:
 
