@@ -15,3 +15,5 @@ type Inputs struct {
 	Pods           bool
 	Help           bool
 }
+
+var HeaderLines = 14

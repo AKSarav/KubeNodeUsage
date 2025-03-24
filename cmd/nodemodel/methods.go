@@ -212,28 +212,26 @@ func FilterForColor(m NodeUsage) []k8s.Node {
 }
 
 func headlinePrinter(m *NodeUsage, output *strings.Builder, Nodes *[]k8s.Node, maxNameWidth *int) {
-
 	unit := getUnit(m.Args.Metrics)
 	freeHeading := "Free(" + unit + ")"
 	maxHeading := "Max(" + unit + ")"
 	uptimeHeading := "Uptime"
 	statusHeading := "Status"
 
-	values := []interface{}{"Name", freeHeading, maxHeading, "Pods", uptimeHeading, statusHeading}
 	if m.Args.LabelToDisplay != "" {
-		m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-10s %-10s %-5s %-8s %-10s %s\n"
-		values = append(values, m.Args.LabelAlias, "Usage%")
-		*maxNameWidth = *maxNameWidth + 12
+		m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-10s %-10s %-5s %-8s %-10s %-15s %-30s\n"
+		fmt.Fprintf(output, m.Format, "Name", freeHeading, maxHeading, "Pods", uptimeHeading, statusHeading, m.Args.LabelAlias, "Usage%")
 	} else {
-		m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-10s %-10s %-5s %-8s %-10s %s\n"
-		values = append(values, "Usage%")
+		m.Format = "%-" + strconv.Itoa(*maxNameWidth) + "s %-10s %-10s %-5s %-8s %-10s %-30s\n"
+		fmt.Fprintf(output, m.Format, "Name", freeHeading, maxHeading, "Pods", uptimeHeading, statusHeading, "Usage%")
 	}
-	fmt.Fprintf(output, m.Format, values...)
-
 }
 
 func PrintDesign(output *strings.Builder, maxNameWidth int) {
-	lines := strings.Repeat("-", maxNameWidth+73)
+	if maxNameWidth < 30 {
+		maxNameWidth = 30
+	}
+	lines := strings.Repeat("-", maxNameWidth+83)
 	fmt.Fprint(output, lines)
 	fmt.Fprint(output, "\n")
 }
@@ -254,7 +252,6 @@ func MetricsHandler(m NodeUsage, output *strings.Builder) {
 		}
 	}
 	// Header and Version info
-
 	fmt.Fprintf(output, "\n# KubeNodeUsage\n# Version: %s\n# https://github.com/AKSarav/KubeNodeUsage\n\n", utils.Version)
 
 	if !m.Args.NoInfo {
@@ -268,36 +265,76 @@ func MetricsHandler(m NodeUsage, output *strings.Builder) {
 	if m.Args.Metrics == "memory" {
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_memory_percent) / 100.0)
-			values := []interface{}{node.Name, strconv.Itoa(node.Free_memory / 1024), strconv.Itoa(node.Capacity_memory / 1024), node.TotalPods, node.Uptime, node.Status}
 			if m.Args.LabelToDisplay != "" {
-				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
+				fmt.Fprintf(output, m.Format,
+					node.Name,
+					strconv.Itoa(node.Free_memory/1024),
+					strconv.Itoa(node.Capacity_memory/1024),
+					node.TotalPods,
+					node.Uptime,
+					node.Status,
+					node.LabelToDisplay,
+					prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
 			} else {
-				values = append(values, prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
+				fmt.Fprintf(output, m.Format,
+					node.Name,
+					strconv.Itoa(node.Free_memory/1024),
+					strconv.Itoa(node.Capacity_memory/1024),
+					node.TotalPods,
+					node.Uptime,
+					node.Status,
+					prog.ViewAs(float64(node.Usage_memory_percent)/100.0))
 			}
-			fmt.Fprintf(output, m.Format, values...)
 		}
 	} else if m.Args.Metrics == "cpu" {
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_cpu_percent) / 100.0)
-			values := []interface{}{node.Name, strconv.Itoa(int(node.Free_cpu)), strconv.Itoa(node.Capacity_cpu), node.TotalPods, node.Uptime, node.Status}
 			if m.Args.LabelToDisplay != "" {
-				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
+				fmt.Fprintf(output, m.Format,
+					node.Name,
+					strconv.Itoa(int(node.Free_cpu)),
+					strconv.Itoa(node.Capacity_cpu),
+					node.TotalPods,
+					node.Uptime,
+					node.Status,
+					node.LabelToDisplay,
+					prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
 			} else {
-				values = append(values, prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
+				fmt.Fprintf(output, m.Format,
+					node.Name,
+					strconv.Itoa(int(node.Free_cpu)),
+					strconv.Itoa(node.Capacity_cpu),
+					node.TotalPods,
+					node.Uptime,
+					node.Status,
+					prog.ViewAs(float64(node.Usage_cpu_percent)/100.0))
 			}
-			fmt.Fprintf(output, m.Format, values...)
 		}
 	} else if m.Args.Metrics == "disk" {
 		for _, node := range filteredNodes {
 			prog := GetBar(float64(node.Usage_disk_percent) / 100.0)
-			values := []interface{}{node.Name, strconv.Itoa(node.Free_disk / 1024 / 1024), strconv.Itoa(node.Capacity_disk / 1024 / 1024), node.TotalPods, node.Uptime, node.Status}
+			// Convert bytes to GB (1 GB = 1024^3 bytes)
+			gbDivisor := 1024 * 1024 * 1024
 			if m.Args.LabelToDisplay != "" {
-				values = append(values, node.LabelToDisplay, prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
+				fmt.Fprintf(output, m.Format,
+					node.Name,
+					fmt.Sprintf("%.1f", float64(node.Free_disk)/float64(gbDivisor)),
+					fmt.Sprintf("%.1f", float64(node.Capacity_disk)/float64(gbDivisor)),
+					node.TotalPods,
+					node.Uptime,
+					node.Status,
+					node.LabelToDisplay,
+					prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
 			} else {
-				values = append(values, prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
+				fmt.Fprintf(output, m.Format,
+					node.Name,
+					fmt.Sprintf("%.1f", float64(node.Free_disk)/float64(gbDivisor)),
+					fmt.Sprintf("%.1f", float64(node.Capacity_disk)/float64(gbDivisor)),
+					node.TotalPods,
+					node.Uptime,
+					node.Status,
+					prog.ViewAs(float64(node.Usage_disk_percent)/100.0))
 			}
-			fmt.Fprintf(output, m.Format, values...)
 		}
-
 	}
 }
