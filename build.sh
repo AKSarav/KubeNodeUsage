@@ -15,7 +15,7 @@ fi
 
 # Find the version declaration on the version.go file and change it to the new version 
 echo "Updating the version in version.go"
-sed -i -e "s/Version = \"v[0-9]*\\.[0-9]*\\.[0-9]*\"/Version = \"v${SEMVER}\"/" utils/version.go
+sed -i  "s/Version = \"v[0-9]*\\.[0-9]*\\.[0-9]*\"/Version = \"v${SEMVER}\"/" utils/version.go
 
 # open the version.go file and print the version
 cat utils/version.go
