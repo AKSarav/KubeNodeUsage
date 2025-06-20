@@ -157,7 +157,7 @@ brew install kubenodeusage
 #### With GO install command  🚀
 
 ```
-go install github.com/AKSarav/KubeNodeUsage/v3@v3.0.3
+go install github.com/AKSarav/KubeNodeUsage/v3@v3.0.4
 
 ```
 
