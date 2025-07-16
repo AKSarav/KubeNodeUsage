@@ -100,7 +100,10 @@ type KubeletStats struct {
 }
 
 func ClusterInfo() Cluster {
-	kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	kubeconfig := os.Getenv("KUBECONFIG")
+	if kubeconfig == "" {
+		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	}
 	confvar := clientcmd.GetConfigFromFileOrDie(kubeconfig)
 
 	K8sinfo := Cluster{}
@@ -348,11 +351,13 @@ func getPodStats(clientset *kubernetes.Clientset, node *core.Node, podName strin
 }
 
 func Nodes(inputs *utils.Inputs) (NodeStatsList []Node) {
-
 	metric := inputs.Metrics
 
 	utils.InitLogger()
-	kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	kubeconfig := os.Getenv("KUBECONFIG")
+	if kubeconfig == "" {
+		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	}
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {

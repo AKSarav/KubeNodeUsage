@@ -14,7 +14,7 @@ You no longer have to wait for that `prometheus` and `grafana` - Just check the 
 
 ![Alt text](assets/KubeNodeUsage3.0.4.gif)
 
-KubeNodeUsage use your local KubeConfig file to connect to the cluster and use Kubernetes API directly using Kubernetes GO SDK
+KubeNodeUsage use your local kubeconfig file to connect to the cluster and use Kubernetes API directly using Kubernetes GO SDK
 
 It fetches the Node and Pod Metrics from Kubernetes API and apply filters and aggreations to display it in a nice human readable Graphical format as Bar Charts.
 
@@ -123,17 +123,17 @@ I have tested KubeNodeUsage starting from **1.19 - 1.29** ( the latest stable ve
 
 KubeNodeUsage is written in `GoLang` and uses `client-go` and `kubernetes` SDK libraries
 
-When you start KubeNodeUsage - It try to read the `$HOME/.kube/config` file in your HOME directory
+When you start KubeNodeUsage - It first checks for the `KUBECONFIG` environment variable. If set, it will use that path for the Kubernetes configuration. If not set, it falls back to reading the `$HOME/.kube/config` file in your HOME directory.
 
-KubeNodeUsage connects to the Default cluster set by the `CurrentContext` on the ./kube/config file
+KubeNodeUsage connects to the Default cluster set by the `CurrentContext` on the kubeconfig file.
 
 You can manually edit this file and update it but the recommended way to update current-context is to use `kubectl config use-context`
 
-KubeNodeUsage does not use `kubectl` directly and it relies on the `.kube/config` file and the authentication method defined in there
+KubeNodeUsage does not use `kubectl` directly and it relies on the kubeconfig file and the authentication method defined in there
 
-KubeNodeUsage works the same way - kubectl works based on the configuration information found on .kube/config file
+KubeNodeUsage works the same way - kubectl works based on the configuration information found on the kubeconfig file
 
-If the `kubectl`commands are not working - its highly likely KubeNodeUsage would fail too - In this case you have to check your Kube config file
+If the `kubectl` commands are not working - its highly likely KubeNodeUsage would fail too - In this case you have to check your kubeconfig file
 
 &nbsp; 
 
