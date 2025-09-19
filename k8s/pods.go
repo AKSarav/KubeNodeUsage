@@ -43,7 +43,10 @@ func Pods(inputs *utils.Inputs) (PodStatsList []Pod) {
 	metric := inputs.Metrics
 
 	utils.InitLogger()
-	kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	kubeconfig := os.Getenv("KUBECONFIG")
+	if kubeconfig == "" {
+		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	}
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
